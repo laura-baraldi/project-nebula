@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build
+.next/
+dist/
+coverage/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
