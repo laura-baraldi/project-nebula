@@ -5,7 +5,7 @@
 
 ## 1. Overview
 
-Project Nebula uses PostgreSQL hosted on Supabase.
+Project Nebula uses PostgreSQL hosted on Neon.
 
 The database stores persistent application data.
 
