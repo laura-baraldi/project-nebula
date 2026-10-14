@@ -18,6 +18,7 @@ productsRouter.get("/", async (req, res) => {
     const page = Number(req.query.page ?? 1);
     const limit = Number(req.query.limit ?? 20);
     const sort = req.query.sort ?? "newest";
+    const category = req.query.category;
 
     // Reject sort values that are not defined in sortOptions.
     if (
@@ -28,6 +29,17 @@ productsRouter.get("/", async (req, res) => {
         error: {
           code: "INVALID_SORT",
           message: "Invalid sort option.",
+        },
+      });
+      return;
+    }
+
+    // Validate the optional category parameter.
+    if (category !== undefined && typeof category !== "string") {
+      res.status(400).json({
+        error: {
+          code: "INVALID_CATEGORY",
+          message: "Category must be a string.",
         },
       });
       return;
@@ -57,21 +69,26 @@ productsRouter.get("/", async (req, res) => {
     // Calculate how many products to skip.
     const offset = (page - 1) * limit;
 
-    // Count all active products.
+    // Count active products, optionally filtering by category.
     const countResult = await pool.query(
-      "SELECT COUNT(*)::int AS total FROM products WHERE is_active = TRUE",
+      `SELECT COUNT(*)::int AS total
+      FROM products
+      WHERE is_active = TRUE
+      AND ($1::text IS NULL OR category = $1)`,
+      [category ?? null],
     );
 
     const total: number = countResult.rows[0].total;
 
-    // Fetch only the products belonging to the requested page.
+    // Fetch products, optionally filtering by category.
     const result = await pool.query(
       `SELECT *
       FROM products
       WHERE is_active = TRUE
+      AND ($1::text IS NULL OR category = $1)
       ORDER BY ${orderBy}
-      LIMIT $1 OFFSET $2`,
-      [limit, offset],
+      LIMIT $2 OFFSET $3`,
+      [category ?? null, limit, offset],
     );
 
     res.status(200).json({
