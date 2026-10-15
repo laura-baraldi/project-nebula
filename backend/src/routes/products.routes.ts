@@ -11,11 +11,19 @@ const sortOptions = {
   name_asc: "name ASC, id ASC",
 } as const;
 
+// Maximum value supported by PostgreSQL INTEGER.
+const MAX_PRICE = 2147483647;
+
+// Validates a decimal integer without accepting empty strings,
+// scientific notation, hexadecimal values or decimal points.
+function isDecimalInteger(value: unknown): value is string {
+  return typeof value === "string" && /^\d+$/.test(value);
+}
+
 // GET /api/products
-// List active products with pagination, sorting, and filters.
+// List active products with pagination, sorting and filters.
 productsRouter.get("/", async (req, res) => {
   try {
-    // Define the allowed query parameters.
     const allowedParams = new Set([
       "page",
       "limit",
@@ -26,8 +34,12 @@ productsRouter.get("/", async (req, res) => {
       "q",
     ]);
 
-    // Reject unknown query parameters.
-    for (const param of Object.keys(req.query)) {
+    // Reject unknown or repeated query parameters.
+    const queryParams = new URLSearchParams(
+      req.originalUrl.split("?")[1] ?? "",
+    );
+
+    for (const [param] of queryParams) {
       if (!allowedParams.has(param)) {
         res.status(400).json({
           error: {
@@ -37,16 +49,58 @@ productsRouter.get("/", async (req, res) => {
         });
         return;
       }
+
+      if (queryParams.getAll(param).length > 1) {
+        res.status(400).json({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Repeated query parameter: ${param}`,
+          },
+        });
+        return;
+      }
     }
 
     // Read pagination, sorting and filtering parameters.
-    const page = Number(req.query.page ?? 1);
-    const limit = Number(req.query.limit ?? 20);
+    const rawPage = req.query.page ?? "1";
+    const rawLimit = req.query.limit ?? "20";
     const sort = req.query.sort ?? "newest";
-    const category = req.query.category;
+    const category = queryParams.get("category");
     const minPrice = req.query.min_price;
     const maxPrice = req.query.max_price;
-    const q = req.query.q;
+    const q = queryParams.get("q");
+
+    // Validate pagination before converting to numbers.
+    if (!isDecimalInteger(rawPage) || !isDecimalInteger(rawLimit)) {
+      res.status(400).json({
+        error: {
+          code: "INVALID_PAGINATION",
+          message:
+            "Page must be a positive integer and limit must be between 1 and 100.",
+        },
+      });
+      return;
+    }
+
+    const page = Number(rawPage);
+    const limit = Number(rawLimit);
+
+    if (
+      !Number.isSafeInteger(page) ||
+      page < 1 ||
+      !Number.isSafeInteger(limit) ||
+      limit < 1 ||
+      limit > 100
+    ) {
+      res.status(400).json({
+        error: {
+          code: "INVALID_PAGINATION",
+          message:
+            "Page must be a positive integer and limit must be between 1 and 100.",
+        },
+      });
+      return;
+    }
 
     // Validate the requested sort option.
     if (
@@ -62,37 +116,10 @@ productsRouter.get("/", async (req, res) => {
       return;
     }
 
-    // Validate the optional category parameter.
-    if (category !== undefined && typeof category !== "string") {
-      res.status(400).json({
-        error: {
-          code: "INVALID_CATEGORY",
-          message: "Category must be a string.",
-        },
-      });
-      return;
-    }
-
-    // Remove surrounding whitespace from category.
-    // An empty category is treated as no filter.
     const normalizedCategory = category?.trim() || null;
 
-    // Validate the optional search query.
-    if (q !== undefined && typeof q !== "string") {
-      res.status(400).json({
-        error: {
-          code: "INVALID_SEARCH",
-          message: "Search query must be a string.",
-        },
-      });
-      return;
-    }
-
-    // Remove surrounding whitespace from the search query.
-    // An empty search is treated as no filter.
     const search = q?.trim() || null;
 
-    // Reject searches longer than 100 characters.
     if (search !== null && search.length > 100) {
       res.status(400).json({
         error: {
@@ -103,44 +130,34 @@ productsRouter.get("/", async (req, res) => {
       return;
     }
 
-    // Convert optional price filters to numbers.
+    // Validate price formats before numeric conversion.
+    if (
+      (minPrice !== undefined && !isDecimalInteger(minPrice)) ||
+      (maxPrice !== undefined && !isDecimalInteger(maxPrice))
+    ) {
+      res.status(400).json({
+        error: {
+          code: "INVALID_PRICE_RANGE",
+          message: "Prices must be non-negative decimal integers.",
+        },
+      });
+      return;
+    }
+
     const min = minPrice === undefined ? null : Number(minPrice);
     const max = maxPrice === undefined ? null : Number(maxPrice);
 
-    // Maximum value supported by PostgreSQL INTEGER.
-    const MAX_PRICE = 2147483647;
-
-    // Validate price filters.
+    // Validate price limits and range.
     if (
-      (min !== null &&
-        (!Number.isSafeInteger(min) || min < 0 || min > MAX_PRICE)) ||
-      (max !== null &&
-        (!Number.isSafeInteger(max) || max < 0 || max > MAX_PRICE)) ||
+      (min !== null && (!Number.isSafeInteger(min) || min > MAX_PRICE)) ||
+      (max !== null && (!Number.isSafeInteger(max) || max > MAX_PRICE)) ||
       (min !== null && max !== null && min > max)
     ) {
       res.status(400).json({
         error: {
           code: "INVALID_PRICE_RANGE",
           message:
-            "Prices must be non-negative integers within the supported range, and min_price cannot exceed max_price.",
-        },
-      });
-      return;
-    }
-
-    // Validate pagination parameters.
-    if (
-      !Number.isInteger(page) ||
-      page < 1 ||
-      !Number.isInteger(limit) ||
-      limit < 1 ||
-      limit > 100
-    ) {
-      res.status(400).json({
-        error: {
-          code: "INVALID_PAGINATION",
-          message:
-            "Page must be a positive integer and limit must be between 1 and 100.",
+            "Prices must be within the supported range, and min_price cannot exceed max_price.",
         },
       });
       return;
@@ -151,6 +168,17 @@ productsRouter.get("/", async (req, res) => {
 
     // Calculate how many products to skip.
     const offset = (page - 1) * limit;
+
+    // Reject offsets outside JavaScript's safe integer range.
+    if (!Number.isSafeInteger(offset)) {
+      res.status(400).json({
+        error: {
+          code: "INVALID_PAGINATION",
+          message: "Pagination offset exceeds the supported range.",
+        },
+      });
+      return;
+    }
 
     // Count active products matching the filters.
     const countResult = await pool.query(

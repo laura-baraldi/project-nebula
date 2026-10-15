@@ -11,7 +11,7 @@ import { app } from "../src/app.js";
 
 const mockQuery = vi.mocked(pool.query);
 
-// Simulate the two database queries used by the product list endpoint.
+// Simulate the database queries used by the product list endpoint.
 function mockProductList(
   products: Record<string, unknown>[],
   total = products.length,
@@ -30,7 +30,6 @@ describe("GET /api/products", () => {
       { id: "1", name: "Moonwarm Bodysuit" },
       { id: "2", name: "Nebula Blanket" },
     ];
-
     mockProductList(products);
 
     const response = await request(app).get("/api/products");
@@ -52,10 +51,12 @@ describe("GET /api/products", () => {
     const response = await request(app).get("/api/products?page=2&limit=5");
 
     expect(response.status).toBe(200);
-    expect(response.body.page).toBe(2);
-    expect(response.body.limit).toBe(5);
-    expect(response.body.total).toBe(11);
-    expect(response.body.totalPages).toBe(3);
+    expect(response.body).toMatchObject({
+      page: 2,
+      limit: 5,
+      total: 11,
+      totalPages: 3,
+    });
     expect(mockQuery).toHaveBeenNthCalledWith(2, expect.any(String), [
       null,
       null,
@@ -72,9 +73,13 @@ describe("GET /api/products", () => {
     const response = await request(app).get("/api/products");
 
     expect(response.status).toBe(200);
-    expect(response.body.items).toEqual([]);
-    expect(response.body.total).toBe(0);
-    expect(response.body.totalPages).toBe(0);
+    expect(response.body).toEqual({
+      items: [],
+      page: 1,
+      limit: 20,
+      total: 0,
+      totalPages: 0,
+    });
   });
 
   it.each([
@@ -82,9 +87,15 @@ describe("GET /api/products", () => {
     "/api/products?page=-1",
     "/api/products?page=abc",
     "/api/products?page=1.5",
+    "/api/products?page=1e2",
+    "/api/products?page=",
+    "/api/products?page=9007199254740992",
     "/api/products?limit=0",
     "/api/products?limit=101",
     "/api/products?limit=abc",
+    "/api/products?limit=0x10",
+    "/api/products?limit=",
+    "/api/products?page=9007199254740991&limit=100",
   ])("rejects invalid pagination: %s", async (url) => {
     const response = await request(app).get(url);
 
@@ -147,6 +158,36 @@ describe("GET /api/products", () => {
     ]);
   });
 
+  it("trims whitespace from category", async () => {
+    mockProductList([]);
+
+    const response = await request(app).get(
+      "/api/products?category=%20toys%20",
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockQuery).toHaveBeenNthCalledWith(1, expect.any(String), [
+      "toys",
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it("treats an empty category as no filter", async () => {
+    mockProductList([]);
+
+    const response = await request(app).get("/api/products?category=%20%20");
+
+    expect(response.status).toBe(200);
+    expect(mockQuery).toHaveBeenNthCalledWith(1, expect.any(String), [
+      null,
+      null,
+      null,
+      null,
+    ]);
+  });
+
   it("applies case-insensitive name search", async () => {
     mockProductList([{ id: "1", name: "Moonwarm Bodysuit" }]);
 
@@ -180,7 +221,7 @@ describe("GET /api/products", () => {
     ]);
   });
 
-  it("treats an empty search as no search filter", async () => {
+  it("treats an empty search as no filter", async () => {
     mockProductList([]);
 
     const response = await request(app).get("/api/products?q=%20%20");
@@ -192,6 +233,31 @@ describe("GET /api/products", () => {
       null,
       null,
     ]);
+  });
+
+  it("accepts a search query of exactly 100 characters", async () => {
+    mockProductList([]);
+    const search = "a".repeat(100);
+
+    const response = await request(app).get(`/api/products?q=${search}`);
+
+    expect(response.status).toBe(200);
+    expect(mockQuery).toHaveBeenNthCalledWith(1, expect.any(String), [
+      null,
+      null,
+      null,
+      search,
+    ]);
+  });
+
+  it("rejects search queries longer than 100 characters", async () => {
+    const response = await request(app).get(
+      `/api/products?q=${"a".repeat(101)}`,
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 
   it("combines search, category, price, sort and pagination", async () => {
@@ -217,6 +283,10 @@ describe("GET /api/products", () => {
     "/api/products?min_price=3000&max_price=1000",
     "/api/products?min_price=2147483648",
     "/api/products?max_price=2147483648",
+    "/api/products?min_price=1e2",
+    "/api/products?max_price=0x10",
+    "/api/products?min_price=",
+    "/api/products?max_price=",
   ])("rejects invalid price filters: %s", async (url) => {
     const response = await request(app).get(url);
 
@@ -225,25 +295,38 @@ describe("GET /api/products", () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  it("rejects repeated category parameters", async () => {
+  it("accepts the maximum supported price", async () => {
+    mockProductList([]);
+
     const response = await request(app).get(
-      "/api/products?category=toys&category=food",
+      "/api/products?max_price=2147483647",
     );
 
+    expect(response.status).toBe(200);
+    expect(mockQuery).toHaveBeenNthCalledWith(1, expect.any(String), [
+      null,
+      null,
+      2147483647,
+      null,
+    ]);
+  });
+
+  it.each([
+    "/api/products?category=toys&category=food",
+    "/api/products?q=moon&q=star",
+    "/api/products?page=1&page=2",
+    "/api/products?limit=5&limit=10",
+    "/api/products?sort=newest&sort=price_asc",
+    "/api/products?min_price=100&min_price=200",
+    "/api/products?max_price=500&max_price=1000",
+  ])("rejects repeated query parameters: %s", async (url) => {
+    const response = await request(app).get(url);
+
     expect(response.status).toBe(400);
-    expect(response.body.error.code).toBe("INVALID_CATEGORY");
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  it("rejects repeated search parameters", async () => {
-    const response = await request(app).get("/api/products?q=moon&q=star");
-
-    expect(response.status).toBe(400);
-    expect(response.body.error.code).toBe("INVALID_SEARCH");
-    expect(mockQuery).not.toHaveBeenCalled();
-  });
-
-  // Verify that unknown query parameters are rejected before reaching the database.
   it("rejects unknown query parameters", async () => {
     const response = await request(app).get("/api/products?colore=rosa");
 
@@ -268,45 +351,6 @@ describe("GET /api/products", () => {
     } finally {
       consoleSpy.mockRestore();
     }
-  });
-
-  it("trims whitespace from category", async () => {
-    mockProductList([]);
-
-    const response = await request(app).get(
-      "/api/products?category=%20toys%20",
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockQuery).toHaveBeenNthCalledWith(1, expect.any(String), [
-      "toys",
-      null,
-      null,
-      null,
-    ]);
-  });
-
-  it("treats an empty category as no filter", async () => {
-    mockProductList([]);
-
-    const response = await request(app).get("/api/products?category=%20%20");
-
-    expect(response.status).toBe(200);
-    expect(mockQuery).toHaveBeenNthCalledWith(1, expect.any(String), [
-      null,
-      null,
-      null,
-      null,
-    ]);
-  });
-
-  it("rejects search queries longer than 100 characters", async () => {
-    const longSearch = "a".repeat(101);
-    const response = await request(app).get(`/api/products?q=${longSearch}`);
-
-    expect(response.status).toBe(400);
-    expect(response.body.error.code).toBe("VALIDATION_ERROR");
-    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
 
