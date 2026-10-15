@@ -12,6 +12,8 @@ const sortOptions = {
   name_asc: "name ASC, id ASC",
 } as const;
 
+// GET /api/products
+// List active products with pagination, sorting, and filters.
 productsRouter.get("/", async (req, res) => {
   try {
     // Read pagination, sorting, and filter parameters from the URL.
@@ -154,6 +156,60 @@ productsRouter.get("/", async (req, res) => {
       error: {
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to fetch products",
+      },
+    });
+  }
+});
+
+// GET /api/products/:id
+// Fetch a single active product by its ID.
+productsRouter.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // PostgreSQL BIGINT supports positive 64-bit integers.
+    // Validate the ID as a string to avoid JavaScript precision loss.
+    if (
+      typeof id !== "string" ||
+      !/^[1-9]\d*$/.test(id) ||
+      BigInt(id) > 9223372036854775807n
+    ) {
+      res.status(400).json({
+        error: {
+          code: "INVALID_PRODUCT_ID",
+          message: "Product ID must be a valid positive integer.",
+        },
+      });
+      return;
+    }
+
+    // Query the database using a parameterized SQL statement.
+    const result = await pool.query(
+      `SELECT *
+       FROM products
+       WHERE id = $1::bigint AND is_active = TRUE`,
+      [id],
+    );
+
+    // Return 404 if the product does not exist or is inactive.
+    if (result.rows.length === 0) {
+      res.status(404).json({
+        error: {
+          code: "PRODUCT_NOT_FOUND",
+          message: "Product not found.",
+        },
+      });
+      return;
+    }
+
+    res.status(200).json(result.rows[0]);
+  } catch (error) {
+    console.error("Failed to fetch product:", error);
+
+    res.status(500).json({
+      error: {
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch product",
       },
     });
   }
