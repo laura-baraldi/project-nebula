@@ -19,6 +19,8 @@ productsRouter.get("/", async (req, res) => {
     const limit = Number(req.query.limit ?? 20);
     const sort = req.query.sort ?? "newest";
     const category = req.query.category;
+    const minPrice = req.query.min_price;
+    const maxPrice = req.query.max_price;
 
     // Reject sort values that are not defined in sortOptions.
     if (
@@ -40,6 +42,29 @@ productsRouter.get("/", async (req, res) => {
         error: {
           code: "INVALID_CATEGORY",
           message: "Category must be a string.",
+        },
+      });
+      return;
+    }
+    // Convert optional price filters to numbers.
+    const min = minPrice === undefined ? null : Number(minPrice);
+    const max = maxPrice === undefined ? null : Number(maxPrice);
+    // Maximum value supported by PostgreSQL INTEGER.
+    const MAX_PRICE = 2147483647;
+
+    // Validate price filters.
+    if (
+      (min !== null &&
+        (!Number.isSafeInteger(min) || min < 0 || min > MAX_PRICE)) ||
+      (max !== null &&
+        (!Number.isSafeInteger(max) || max < 0 || max > MAX_PRICE)) ||
+      (min !== null && max !== null && min > max)
+    ) {
+      res.status(400).json({
+        error: {
+          code: "INVALID_PRICE_RANGE",
+          message:
+            "Prices must be non-negative integers, and min_price cannot exceed max_price.",
         },
       });
       return;
@@ -69,26 +94,30 @@ productsRouter.get("/", async (req, res) => {
     // Calculate how many products to skip.
     const offset = (page - 1) * limit;
 
-    // Count active products, optionally filtering by category.
+    // Count active products applying category and price filters.
     const countResult = await pool.query(
       `SELECT COUNT(*)::int AS total
       FROM products
       WHERE is_active = TRUE
-      AND ($1::text IS NULL OR category = $1)`,
-      [category ?? null],
+      AND ($1::text IS NULL OR category = $1)
+      AND ($2::int IS NULL OR price_pawstars >= $2)
+      AND ($3::int IS NULL OR price_pawstars <= $3)`,
+      [category ?? null, min, max],
     );
 
     const total: number = countResult.rows[0].total;
 
-    // Fetch products, optionally filtering by category.
+    // Fetch products applying category, price filters and pagination.
     const result = await pool.query(
       `SELECT *
       FROM products
       WHERE is_active = TRUE
       AND ($1::text IS NULL OR category = $1)
+      AND ($2::int IS NULL OR price_pawstars >= $2)
+      AND ($3::int IS NULL OR price_pawstars <= $3)
       ORDER BY ${orderBy}
-      LIMIT $2 OFFSET $3`,
-      [category ?? null, limit, offset],
+      LIMIT $4 OFFSET $5`,
+      [category ?? null, min, max, limit, offset],
     );
 
     res.status(200).json({
