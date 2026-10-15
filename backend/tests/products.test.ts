@@ -11,7 +11,7 @@ import { app } from "../src/app.js";
 
 const mockQuery = vi.mocked(pool.query);
 
-// Simulate the two queries used by the product list endpoint.
+// Simulate the two database queries used by the product list endpoint.
 function mockProductList(
   products: Record<string, unknown>[],
   total = products.length,
@@ -112,8 +112,7 @@ describe("GET /api/products", () => {
     const response = await request(app).get(`/api/products?sort=${sort}`);
 
     expect(response.status).toBe(200);
-    const sql = mockQuery.mock.calls[1][0];
-    expect(sql).toContain(`ORDER BY ${orderBy}`);
+    expect(mockQuery.mock.calls[1][0]).toContain(`ORDER BY ${orderBy}`);
   });
 
   it("applies category and price filters", async () => {
@@ -244,6 +243,20 @@ describe("GET /api/products", () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  // Verify that unknown query parameters are rejected before reaching the database.
+  it("rejects unknown query parameters", async () => {
+    const response = await request(app).get("/api/products?colore=rosa");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Unknown query parameter: colore",
+      },
+    });
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   it("returns HTTP 500 when the database fails", async () => {
     mockQuery.mockRejectedValueOnce(new Error("Database unavailable"));
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -270,7 +283,6 @@ describe("GET /api/products/:id", () => {
       price_pawstars: 3900,
       is_active: true,
     };
-
     mockQuery.mockResolvedValueOnce({ rows: [product] } as never);
 
     const response = await request(app).get("/api/products/1");

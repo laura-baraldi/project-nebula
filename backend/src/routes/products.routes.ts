@@ -16,6 +16,30 @@ const sortOptions = {
 // List active products with pagination, sorting, and filters.
 productsRouter.get("/", async (req, res) => {
   try {
+    // Define the allowed query parameters.
+    const allowedParams = new Set([
+      "page",
+      "limit",
+      "sort",
+      "category",
+      "min_price",
+      "max_price",
+      "q",
+    ]);
+
+    // Reject any query parameter that is not allowed.
+    for (const param of Object.keys(req.query)) {
+      if (!allowedParams.has(param)) {
+        res.status(400).json({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Unknown query parameter: ${param}`,
+          },
+        });
+        return;
+      }
+    }
+
     // Read pagination, sorting, and filter parameters from the URL.
     const page = Number(req.query.page ?? 1);
     const limit = Number(req.query.limit ?? 20);
