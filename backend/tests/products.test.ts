@@ -269,6 +269,45 @@ describe("GET /api/products", () => {
       consoleSpy.mockRestore();
     }
   });
+
+  it("trims whitespace from category", async () => {
+    mockProductList([]);
+
+    const response = await request(app).get(
+      "/api/products?category=%20toys%20",
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockQuery).toHaveBeenNthCalledWith(1, expect.any(String), [
+      "toys",
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it("treats an empty category as no filter", async () => {
+    mockProductList([]);
+
+    const response = await request(app).get("/api/products?category=%20%20");
+
+    expect(response.status).toBe(200);
+    expect(mockQuery).toHaveBeenNthCalledWith(1, expect.any(String), [
+      null,
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it("rejects search queries longer than 100 characters", async () => {
+    const longSearch = "a".repeat(101);
+    const response = await request(app).get(`/api/products?q=${longSearch}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET /api/products/:id", () => {

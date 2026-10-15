@@ -4,7 +4,6 @@ import { pool } from "../db/pool.js";
 export const productsRouter = Router();
 
 // Maps allowed sort options to SQL clauses.
-// "as const" makes properties readonly and preserves literal types.
 const sortOptions = {
   newest: "created_at DESC, id DESC",
   price_asc: "price_pawstars ASC, id ASC",
@@ -27,7 +26,7 @@ productsRouter.get("/", async (req, res) => {
       "q",
     ]);
 
-    // Reject any query parameter that is not allowed.
+    // Reject unknown query parameters.
     for (const param of Object.keys(req.query)) {
       if (!allowedParams.has(param)) {
         res.status(400).json({
@@ -40,7 +39,7 @@ productsRouter.get("/", async (req, res) => {
       }
     }
 
-    // Read pagination, sorting, and filter parameters from the URL.
+    // Read pagination, sorting and filtering parameters.
     const page = Number(req.query.page ?? 1);
     const limit = Number(req.query.limit ?? 20);
     const sort = req.query.sort ?? "newest";
@@ -74,6 +73,10 @@ productsRouter.get("/", async (req, res) => {
       return;
     }
 
+    // Remove surrounding whitespace from category.
+    // An empty category is treated as no filter.
+    const normalizedCategory = category?.trim() || null;
+
     // Validate the optional search query.
     if (q !== undefined && typeof q !== "string") {
       res.status(400).json({
@@ -86,8 +89,19 @@ productsRouter.get("/", async (req, res) => {
     }
 
     // Remove surrounding whitespace from the search query.
-    // An empty search is treated as no search filter.
+    // An empty search is treated as no filter.
     const search = q?.trim() || null;
+
+    // Reject searches longer than 100 characters.
+    if (search !== null && search.length > 100) {
+      res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Search query must not exceed 100 characters.",
+        },
+      });
+      return;
+    }
 
     // Convert optional price filters to numbers.
     const min = minPrice === undefined ? null : Number(minPrice);
@@ -138,7 +152,7 @@ productsRouter.get("/", async (req, res) => {
     // Calculate how many products to skip.
     const offset = (page - 1) * limit;
 
-    // Count all active products matching the filters.
+    // Count active products matching the filters.
     const countResult = await pool.query(
       `SELECT COUNT(*)::int AS total
        FROM products
@@ -147,12 +161,12 @@ productsRouter.get("/", async (req, res) => {
        AND ($2::int IS NULL OR price_pawstars >= $2)
        AND ($3::int IS NULL OR price_pawstars <= $3)
        AND ($4::text IS NULL OR name ILIKE '%' || $4 || '%')`,
-      [category ?? null, min, max, search],
+      [normalizedCategory, min, max, search],
     );
 
     const total: number = countResult.rows[0].total;
 
-    // Fetch products using filters, sorting, and pagination.
+    // Fetch products using filters, sorting and pagination.
     const result = await pool.query(
       `SELECT *
        FROM products
@@ -163,7 +177,7 @@ productsRouter.get("/", async (req, res) => {
        AND ($4::text IS NULL OR name ILIKE '%' || $4 || '%')
        ORDER BY ${orderBy}
        LIMIT $5 OFFSET $6`,
-      [category ?? null, min, max, search, limit, offset],
+      [normalizedCategory, min, max, search, limit, offset],
     );
 
     res.status(200).json({
@@ -191,8 +205,7 @@ productsRouter.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    // PostgreSQL BIGINT supports positive 64-bit integers.
-    // Validate the ID as a string to avoid JavaScript precision loss.
+    // Validate PostgreSQL BIGINT IDs without JavaScript precision loss.
     if (
       typeof id !== "string" ||
       !/^[1-9]\d*$/.test(id) ||
@@ -207,7 +220,7 @@ productsRouter.get("/:id", async (req, res) => {
       return;
     }
 
-    // Query the database using a parameterized SQL statement.
+    // Fetch the active product using a parameterized query.
     const result = await pool.query(
       `SELECT *
        FROM products
@@ -215,7 +228,7 @@ productsRouter.get("/:id", async (req, res) => {
       [id],
     );
 
-    // Return 404 if the product does not exist or is inactive.
+    // Missing or inactive products return HTTP 404.
     if (result.rows.length === 0) {
       res.status(404).json({
         error: {
