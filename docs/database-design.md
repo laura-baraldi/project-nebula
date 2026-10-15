@@ -1,11 +1,11 @@
 # Database Design: Project Nebula
 
 > Living document. Only the database structures required for the current
-> development phase are documented in detail. Last updated: 2026-10-12
+> development phase are documented in detail. Last updated: 2026-10-15
 
 ## 1. Overview
 
-Project Nebula uses PostgreSQL hosted on Supabase.
+Project Nebula uses PostgreSQL hosted on Neon.
 
 The database stores persistent application data.
 
@@ -38,40 +38,54 @@ Each row represents one product.
 
 ### SQL Schema
 
+The current schema results from the two implemented SQL migrations.
+
 ```sql
 CREATE TABLE products (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
-    name TEXT NOT NULL,
+    name TEXT NOT NULL
+        CHECK (length(trim(name)) > 0),
 
     description TEXT NOT NULL DEFAULT '',
 
     price_pawstars INTEGER NOT NULL
         CHECK (price_pawstars >= 0),
 
-    category TEXT NOT NULL,
+    category TEXT NOT NULL
+        CHECK (length(trim(category)) > 0),
 
     stock_quantity INTEGER NOT NULL DEFAULT 0
         CHECK (stock_quantity >= 0),
 
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    slug TEXT NOT NULL UNIQUE
+        CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+
+    image_url TEXT
 );
 ```
 
+This represents the resulting table structure. The actual migrations are
+stored separately and applied in order.
+
 ### Columns
 
-| Column           | Type        | Nullable | Default  | Purpose             |
-| ---------------- | ----------- | -------- | -------- | ------------------- |
-| `id`             | BIGINT      | No       | Identity | Unique identifier   |
-| `name`           | TEXT        | No       | None     | Product name        |
-| `description`    | TEXT        | No       | `''`     | Product description |
-| `price_pawstars` | INTEGER     | No       | None     | Price in Pawstars   |
-| `category`       | TEXT        | No       | None     | Product category    |
-| `stock_quantity` | INTEGER     | No       | 0        | Available units     |
-| `is_active`      | BOOLEAN     | No       | TRUE     | Product visibility  |
-| `created_at`     | TIMESTAMPTZ | No       | now()    | Creation timestamp  |
+| Column           | Type        | Nullable | Default  | Purpose                   |
+| ---------------- | ----------- | -------- | -------- | ------------------------- |
+| `id`             | BIGINT      | No       | Identity | Unique identifier         |
+| `name`           | TEXT        | No       | None     | Product name              |
+| `description`    | TEXT        | No       | `''`     | Product description       |
+| `price_pawstars` | INTEGER     | No       | None     | Price in Pawstars         |
+| `category`       | TEXT        | No       | None     | Product category          |
+| `stock_quantity` | INTEGER     | No       | 0        | Available units           |
+| `is_active`      | BOOLEAN     | No       | TRUE     | Product visibility        |
+| `created_at`     | TIMESTAMPTZ | No       | now()    | Creation timestamp        |
+| `slug`           | TEXT        | No       | None     | Unique URL-friendly name  |
+| `image_url`      | TEXT        | Yes      | NULL     | Product image URL or path |
 
 ## 3. Constraints and Data Types
 
@@ -98,9 +112,16 @@ name TEXT NOT NULL
 
 A product name cannot be NULL.
 
-However, `NOT NULL` does not reject empty strings such as `''`.
+However, `NOT NULL` alone does not reject empty strings such as `''`.
 
-The backend will validate name content.
+The current database also uses CHECK constraints to reject empty or
+whitespace-only names and categories.
+
+Example:
+
+```sql
+CHECK (length(trim(name)) > 0)
+```
 
 ### DEFAULT
 
@@ -138,6 +159,27 @@ stock_quantity INTEGER NOT NULL DEFAULT 0
 
 Stock cannot become negative.
 
+For slugs:
+
+```sql
+CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
+```
+
+This restricts slugs to lowercase letters, digits and hyphens in the
+supported format.
+
+### UNIQUE
+
+Prevents duplicate values.
+
+Example:
+
+```sql
+slug TEXT NOT NULL UNIQUE
+```
+
+Two products cannot have the same slug.
+
 ### Data Types
 
 `BIGINT`
@@ -153,7 +195,7 @@ Stock cannot become negative.
 `TEXT`
 
 - Variable-length text.
-- Used for names, descriptions and categories.
+- Used for names, descriptions, categories, slugs and image URLs.
 
 `BOOLEAN`
 
@@ -237,9 +279,15 @@ performance.
 
 ## 6. Sample Data
 
-Initial sample products will be inserted with SQL.
+Initial sample products have been inserted using SQL.
 
-Example:
+The seed file is:
+
+`backend/db/seeds/001_seed_products.sql`
+
+The current database contains 30 fictional products across eight categories.
+
+Example of a product insertion:
 
 ```sql
 INSERT INTO products (
@@ -247,16 +295,21 @@ INSERT INTO products (
     description,
     price_pawstars,
     category,
-    stock_quantity
+    stock_quantity,
+    slug
 )
 VALUES (
     'Sphynx Sweater',
     'Warm, because they are not.',
     3900,
     'clothing',
-    14
+    14,
+    'sphynx-sweater'
 );
 ```
+
+This example illustrates the current required columns, including `slug`.
+The actual seed file contains the project's fictional product dataset.
 
 PostgreSQL automatically supplies:
 
@@ -264,15 +317,17 @@ PostgreSQL automatically supplies:
 - `is_active`
 - `created_at`
 
-More sample products will be added during catalog development.
+The optional `image_url` can be NULL.
+
+Additional products may be added during future development.
 
 ## 7. Database Access
 
-The Express backend will communicate with PostgreSQL using SQL.
+The Express backend communicates with PostgreSQL using SQL.
 
-The initial plan is to use the Node.js `pg` library.
+The project uses the Node.js `pg` library.
 
-No ORM will be used initially.
+No ORM is currently used.
 
 ### Architecture
 
@@ -287,6 +342,8 @@ Express API
    v
 PostgreSQL
 ```
+
+The Next.js frontend is planned.
 
 ### Security
 
@@ -303,9 +360,10 @@ PostgreSQL BIGINT values can exceed JavaScript's safe integer range.
 
 The backend must handle BIGINT identifiers without precision loss.
 
-The `pg` library commonly returns BIGINT values as strings.
+The `pg` library returns BIGINT values as strings by default.
 
-ID serialization and validation must remain consistent with the API contract.
+The current product API returns ID values as JSON strings and validates
+product IDs using `BigInt`.
 
 ### Transactions
 
@@ -320,24 +378,42 @@ They will be especially important for:
 
 ## 8. Database Migrations
 
-Schema changes will be tracked in versioned SQL files.
+Schema changes are tracked in versioned SQL files.
 
-Proposed directory:
+Directory:
 
 `backend/db/migrations/`
 
-First migration:
+### Migration 001
 
 `001_create_products.sql`
 
-This migration will contain the executable CREATE TABLE and CREATE INDEX
-statements.
+This migration creates:
+
+- The `products` table
+- Initial columns
+- CHECK constraints
+- The `products_active_category_idx` index
+
+### Migration 002
+
+`002_add_product_slug_and_image.sql`
+
+This migration adds:
+
+- `slug`: required, unique and validated
+- `image_url`: optional image URL or path
+
+Both migrations have been applied to the project's current Neon databases.
+
+Future migrations must account for existing records when adding required
+columns or modifying constraints.
 
 ### Documentation vs Migrations
 
 `database-design.md`:
 
-- Describes the intended schema.
+- Describes the intended and implemented schema.
 - Explains data types and constraints.
 - Documents design decisions.
 - Discusses indexes and trade-offs.
@@ -348,7 +424,22 @@ Migration files:
 - Apply schema changes to PostgreSQL.
 - Track database structure over time.
 
-The migration process will be selected before the first migration is applied.
+The project currently uses SQL migration files. An automated migration
+management system has not yet been introduced.
+
+### Database Branches
+
+Neon is used with separate database branches.
+
+- `production`: main application database branch.
+- `testing`: dedicated branch for PostgreSQL integration tests.
+
+The backend reads its normal database connection from `DATABASE_URL`.
+
+Integration tests use `TEST_DATABASE_URL` to connect to the separate testing
+branch.
+
+Integration tests must not accidentally modify production data.
 
 ## 9. Open Decisions
 
@@ -364,6 +455,12 @@ The migration process will be selected before the first migration is applied.
 | Order and order item tables         | Before orders                |
 | Stock reservation strategy          | Before checkout              |
 | Payment records                     | Before simulated checkout    |
+
+The initial decisions about BIGINT IDs, empty name/category constraints and
+product categories have been implemented.
+
+The database now includes `image_url`, but actual image storage and hosting
+remain to be decided.
 
 ## 10. Future Database Expansion
 
@@ -386,6 +483,7 @@ corresponding features are implemented.
 
 ---
 
-**Document status:** Initial database design draft.
+**Document status:** Initial products schema implemented and documented.
 
-No migrations have been applied yet.
+The current two migrations have been applied. Future database structures
+will be added incrementally.
