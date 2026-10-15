@@ -14,15 +14,16 @@ const sortOptions = {
 
 productsRouter.get("/", async (req, res) => {
   try {
-    // Read page and limit from the query string.
+    // Read pagination, sorting, and filter parameters from the URL.
     const page = Number(req.query.page ?? 1);
     const limit = Number(req.query.limit ?? 20);
     const sort = req.query.sort ?? "newest";
     const category = req.query.category;
     const minPrice = req.query.min_price;
     const maxPrice = req.query.max_price;
+    const q = req.query.q;
 
-    // Reject sort values that are not defined in sortOptions.
+    // Validate the requested sort option.
     if (
       typeof sort !== "string" ||
       !Object.prototype.hasOwnProperty.call(sortOptions, sort)
@@ -46,9 +47,26 @@ productsRouter.get("/", async (req, res) => {
       });
       return;
     }
+
+    // Validate the optional search query.
+    if (q !== undefined && typeof q !== "string") {
+      res.status(400).json({
+        error: {
+          code: "INVALID_SEARCH",
+          message: "Search query must be a string.",
+        },
+      });
+      return;
+    }
+
+    // Remove surrounding whitespace from the search query.
+    // An empty search is treated as no search filter.
+    const search = q?.trim() || null;
+
     // Convert optional price filters to numbers.
     const min = minPrice === undefined ? null : Number(minPrice);
     const max = maxPrice === undefined ? null : Number(maxPrice);
+
     // Maximum value supported by PostgreSQL INTEGER.
     const MAX_PRICE = 2147483647;
 
@@ -64,14 +82,11 @@ productsRouter.get("/", async (req, res) => {
         error: {
           code: "INVALID_PRICE_RANGE",
           message:
-            "Prices must be non-negative integers, and min_price cannot exceed max_price.",
+            "Prices must be non-negative integers within the supported range, and min_price cannot exceed max_price.",
         },
       });
       return;
     }
-
-    // Get the SQL ordering clause for the selected sort option.
-    const orderBy = sortOptions[sort as keyof typeof sortOptions];
 
     // Validate pagination parameters.
     if (
@@ -91,33 +106,38 @@ productsRouter.get("/", async (req, res) => {
       return;
     }
 
+    // Get the SQL ordering clause for the selected sort option.
+    const orderBy = sortOptions[sort as keyof typeof sortOptions];
+
     // Calculate how many products to skip.
     const offset = (page - 1) * limit;
 
-    // Count active products applying category and price filters.
+    // Count all active products matching the filters.
     const countResult = await pool.query(
       `SELECT COUNT(*)::int AS total
-      FROM products
-      WHERE is_active = TRUE
-      AND ($1::text IS NULL OR category = $1)
-      AND ($2::int IS NULL OR price_pawstars >= $2)
-      AND ($3::int IS NULL OR price_pawstars <= $3)`,
-      [category ?? null, min, max],
+       FROM products
+       WHERE is_active = TRUE
+       AND ($1::text IS NULL OR category = $1)
+       AND ($2::int IS NULL OR price_pawstars >= $2)
+       AND ($3::int IS NULL OR price_pawstars <= $3)
+       AND ($4::text IS NULL OR name ILIKE '%' || $4 || '%')`,
+      [category ?? null, min, max, search],
     );
 
     const total: number = countResult.rows[0].total;
 
-    // Fetch products applying category, price filters and pagination.
+    // Fetch products using filters, sorting, and pagination.
     const result = await pool.query(
       `SELECT *
-      FROM products
-      WHERE is_active = TRUE
-      AND ($1::text IS NULL OR category = $1)
-      AND ($2::int IS NULL OR price_pawstars >= $2)
-      AND ($3::int IS NULL OR price_pawstars <= $3)
-      ORDER BY ${orderBy}
-      LIMIT $4 OFFSET $5`,
-      [category ?? null, min, max, limit, offset],
+       FROM products
+       WHERE is_active = TRUE
+       AND ($1::text IS NULL OR category = $1)
+       AND ($2::int IS NULL OR price_pawstars >= $2)
+       AND ($3::int IS NULL OR price_pawstars <= $3)
+       AND ($4::text IS NULL OR name ILIKE '%' || $4 || '%')
+       ORDER BY ${orderBy}
+       LIMIT $5 OFFSET $6`,
+      [category ?? null, min, max, search, limit, offset],
     );
 
     res.status(200).json({
