@@ -1,4 +1,3 @@
-
 # Backend Architecture — Project Nebula
 
 ## Overview
@@ -15,6 +14,7 @@ responsibilities clear and make future development easier.
 Creates and configures the Express application.
 
 Responsibilities:
+
 - Initialize Express
 - Configure middleware, such as `express.json()`
 - Register routers under their API paths
@@ -25,6 +25,7 @@ Responsibilities:
 Starts the HTTP server.
 
 Responsibilities:
+
 - Import the Express application
 - Define the listening port
 - Start listening for incoming HTTP requests
@@ -34,17 +35,31 @@ Responsibilities:
 Defines HTTP endpoints related to products.
 
 Responsibilities:
+
 - Register product routes, such as `GET /api/products`
 - Handle incoming product-related HTTP requests
 - Send HTTP responses
+
+### `src/db/pool.ts`
+
+Creates and exports the PostgreSQL connection pool using the `pg` library.
+
+Responsibilities:
+
+- Read the database connection string from `DATABASE_URL`
+- Initialize the PostgreSQL connection pool
+- Provide a shared pool for database queries
+- Keep database connection configuration separate from HTTP routes
 
 ## Request Flow
 
 1. The client sends an HTTP request.
 2. The Express server receives the request.
 3. The application forwards the request to the appropriate router.
-4. The matching route handles the request.
-5. Express sends an HTTP response to the client.
+4. The matching route validates the request parameters.
+5. The route executes parameterized SQL queries through the PostgreSQL connection pool when database access is required.
+6. PostgreSQL returns the query results.
+7. The route processes the results and sends an HTTP response to the client.
 
 ## Why Separate app.ts and server.ts?
 

@@ -2,7 +2,7 @@
 
 > Living document. Only what is decided or being built right now is described in
 > detail. Future features are documented when their development begins. Last
-> updated: 2026-10-12
+> updated: 2026-10-15
 
 ## 1. Overview
 
@@ -22,10 +22,10 @@ The planet's currency is the **Pawstar** (plural: Pawstars), abbreviated as PWS.
 | ----------- | ------------------------------ | ---------------------------------------------------- |
 | Frontend    | Next.js + React + TypeScript   | Routing, React practice and server-rendered pages    |
 | Backend     | Node.js + Express + TypeScript | Practice designing REST API contracts                |
-| Database    | PostgreSQL (Supabase)          | Practice SQL and relational databases without an ORM |
+| Database    | PostgreSQL (Neon)              | Practice SQL and relational databases without an ORM |
 | Development | Local only                     | Focus on learning rather than deployment             |
 
-- Frontend: `http://localhost:3000`
+- Frontend: `http://localhost:3000` (planned)
 - Backend: `http://localhost:4000`
 
 ### Architecture Rules
@@ -54,6 +54,9 @@ The application will support:
 - Orders
 - Simulated checkout and payments
 
+The product catalog backend API is implemented. The remaining e-commerce
+features will be developed incrementally.
+
 ### Future Features
 
 Not included in the initial version:
@@ -77,7 +80,8 @@ Requests and responses use JSON.
 
 - Resource fields use `snake_case`.
 - Pagination metadata uses `camelCase`.
-- Resource IDs are positive integers.
+- Resource IDs are positive integers stored as PostgreSQL `BIGINT`.
+- Product IDs are returned as JSON strings to avoid JavaScript precision loss.
 
 ### Currency
 
@@ -91,7 +95,7 @@ Example:
 
 ```json
 {
-    "price_pawstars": 3900
+  "price_pawstars": 3900
 }
 ```
 
@@ -105,7 +109,7 @@ List endpoints use server-side pagination.
 
 | Parameter | Default           | Validation                |
 | --------- | ----------------- | ------------------------- |
-| `page`    | 1                 | Integer >= 1              |
+| `page`    | 1                 | Positive decimal integer  |
 | `limit`   | 20                | Integer between 1 and 100 |
 | `sort`    | Endpoint-specific | Allowed values only       |
 
@@ -126,15 +130,17 @@ prevent page shifts if records are inserted or deleted between requests.
 
 Invalid pagination parameters return HTTP 400.
 
+Page and offset values must remain within JavaScript's safe integer range.
+
 ### Standard List Response
 
 ```json
 {
-    "items": [],
-    "page": 1,
-    "limit": 20,
-    "total": 0,
-    "totalPages": 0
+  "items": [],
+  "page": 1,
+  "limit": 20,
+  "total": 0,
+  "totalPages": 0
 }
 ```
 
@@ -148,18 +154,14 @@ When `total` is zero, `totalPages` is zero.
 
 ### Standard Error Response
 
+Implemented endpoints return errors using this structure:
+
 ```json
 {
-    "error": {
-        "code": "VALIDATION_ERROR",
-        "message": "Invalid query parameters",
-        "details": [
-            {
-                "field": "limit",
-                "issue": "must be between 1 and 100"
-            }
-        ]
-    }
+  "error": {
+    "code": "INVALID_PAGINATION",
+    "message": "Page must be a positive integer and limit must be between 1 and 100."
+  }
 }
 ```
 
@@ -173,21 +175,26 @@ Successful responses:
 
 Error responses:
 
-| HTTP Status | Application Code | Meaning                           |
-| ----------- | ---------------- | --------------------------------- |
-| 400         | VALIDATION_ERROR | Invalid input                     |
-| 401         | UNAUTHORIZED     | Missing or invalid authentication |
-| 403         | FORBIDDEN        | Insufficient permissions          |
-| 404         | NOT_FOUND        | Resource not found                |
-| 409         | CONFLICT         | Business rule conflict            |
-| 429         | RATE_LIMITED     | Too many requests                 |
-| 500         | INTERNAL_ERROR   | Unexpected server error           |
+| HTTP Status | Application Code      | Meaning                           |
+| ----------- | --------------------- | --------------------------------- |
+| 400         | VALIDATION_ERROR      | Unknown or repeated parameters    |
+| 400         | INVALID_PAGINATION    | Invalid page, limit or offset     |
+| 400         | INVALID_SORT          | Invalid sorting option            |
+| 400         | INVALID_PRICE_RANGE   | Invalid price range               |
+| 400         | INVALID_PRODUCT_ID    | Invalid product ID                |
+| 401         | UNAUTHORIZED          | Missing or invalid authentication |
+| 403         | FORBIDDEN             | Insufficient permissions          |
+| 404         | PRODUCT_NOT_FOUND     | Missing or inactive product       |
+| 409         | CONFLICT              | Business rule conflict            |
+| 429         | RATE_LIMITED          | Too many requests                 |
+| 500         | INTERNAL_SERVER_ERROR | Unexpected server error           |
+
+Only the codes relevant to the currently implemented product endpoints are
+implemented. Authentication, conflicts and rate limiting are planned for later
+features.
 
 Application error codes are custom identifiers returned in JSON, not HTTP reason
 phrases.
-
-Only errors relevant to currently implemented endpoints will be handled
-initially.
 
 Unexpected errors must not expose stack traces, credentials or other sensitive
 internal information.
@@ -221,9 +228,13 @@ The database document describes:
 - Indexes
 - Database design decisions
 
-Schema changes will be managed through SQL migration files.
+Schema changes are managed through SQL migration files.
+
+The product table and its initial migrations have been applied to Neon.
 
 ## 5. Products API
+
+The following endpoints are implemented.
 
 ### GET /api/products
 
@@ -264,38 +275,52 @@ Filtering, sorting and pagination are performed by PostgreSQL.
 
 #### Success Response: 200 OK
 
+The following example is illustrative. Actual product values depend on the
+database contents.
+
 ```json
 {
-    "items": [
-        {
-            "id": 1,
-            "name": "Sphynx Sweater",
-            "description": "Warm, because they are not.",
-            "price_pawstars": 3900,
-            "category": "clothing",
-            "stock_quantity": 14
-        },
-        {
-            "id": 2,
-            "name": "Cosmic Blanket",
-            "description": "A warm blanket for interstellar naps.",
-            "price_pawstars": 4500,
-            "category": "clothing",
-            "stock_quantity": 8
-        }
-    ],
-    "page": 1,
-    "limit": 20,
-    "total": 2,
-    "totalPages": 1
+  "items": [
+    {
+      "id": "1",
+      "name": "Sphynx Sweater",
+      "description": "Warm, because they are not.",
+      "price_pawstars": 3900,
+      "category": "clothing",
+      "stock_quantity": 14,
+      "is_active": true,
+      "created_at": "2026-10-12T10:00:00.000Z",
+      "slug": "sphynx-sweater",
+      "image_url": null
+    },
+    {
+      "id": "2",
+      "name": "Cosmic Blanket",
+      "description": "A warm blanket for interstellar naps.",
+      "price_pawstars": 4500,
+      "category": "clothing",
+      "stock_quantity": 8,
+      "is_active": true,
+      "created_at": "2026-10-12T10:00:00.000Z",
+      "slug": "cosmic-blanket",
+      "image_url": null
+    }
+  ],
+  "page": 1,
+  "limit": 20,
+  "total": 2,
+  "totalPages": 1
 }
 ```
 
+The current API selects all product columns from PostgreSQL.
+
 #### Validation
 
-- `page` must be an integer >= 1.
+- `page` must be a positive decimal integer.
 - `limit` must be an integer between 1 and 100.
 - `min_price` and `max_price` must be non-negative integers.
+- Price values cannot exceed PostgreSQL INTEGER's maximum of 2147483647.
 - `min_price` cannot exceed `max_price`.
 - `sort` must be an allowed value.
 - Unknown query parameters return `400`.
@@ -309,8 +334,11 @@ Filtering, sorting and pagination are performed by PostgreSQL.
 
 #### Errors
 
-- `400 VALIDATION_ERROR`: invalid query parameters.
-- `500 INTERNAL_ERROR`: unexpected server error.
+- `400 VALIDATION_ERROR`: unknown or repeated parameters, or invalid search length.
+- `400 INVALID_PAGINATION`: invalid page, limit or offset.
+- `400 INVALID_SORT`: unsupported sorting option.
+- `400 INVALID_PRICE_RANGE`: invalid price filters.
+- `500 INTERNAL_SERVER_ERROR`: unexpected server error.
 
 #### Business Rules
 
@@ -329,6 +357,8 @@ Filtering, sorting and pagination are performed by PostgreSQL.
 - User-provided values are passed through parameterized SQL queries.
 - Sort values are mapped to a fixed allowlist of SQL ordering expressions.
 
+The two frontend-specific rules above are planned frontend behavior.
+
 #### Example: No Matching Products
 
 Request:
@@ -339,11 +369,11 @@ Response: `200 OK`
 
 ```json
 {
-    "items": [],
-    "page": 1,
-    "limit": 20,
-    "total": 0,
-    "totalPages": 0
+  "items": [],
+  "page": 1,
+  "limit": 20,
+  "total": 0,
+  "totalPages": 0
 }
 ```
 
@@ -359,11 +389,11 @@ Response: `200 OK`
 
 ```json
 {
-    "items": [],
-    "page": 50,
-    "limit": 20,
-    "total": 35,
-    "totalPages": 2
+  "items": [],
+  "page": 50,
+  "limit": 20,
+  "total": 35,
+  "totalPages": 2
 }
 ```
 
@@ -373,18 +403,25 @@ Retrieve a single active product.
 
 #### Path Parameters
 
-- `id`: required positive integer.
+- `id`: required positive decimal integer without leading zeroes.
+- IDs must fit within PostgreSQL's signed BIGINT range.
 
 #### Success Response: 200 OK
 
+The following example is illustrative.
+
 ```json
 {
-    "id": 1,
-    "name": "Sphynx Sweater",
-    "description": "Warm, because they are not.",
-    "price_pawstars": 3900,
-    "category": "clothing",
-    "stock_quantity": 14
+  "id": "1",
+  "name": "Sphynx Sweater",
+  "description": "Warm, because they are not.",
+  "price_pawstars": 3900,
+  "category": "clothing",
+  "stock_quantity": 14,
+  "is_active": true,
+  "created_at": "2026-10-12T10:00:00.000Z",
+  "slug": "sphynx-sweater",
+  "image_url": null
 }
 ```
 
@@ -394,12 +431,13 @@ Retrieve a single active product.
 - Invalid ID formats return `400`.
 - Inactive products are not publicly accessible.
 - IDs must be processed without numeric precision loss.
+- The maximum supported ID is `9223372036854775807`.
 
 #### Errors
 
-- `400 VALIDATION_ERROR`: invalid product ID.
-- `404 NOT_FOUND`: missing or inactive product.
-- `500 INTERNAL_ERROR`: unexpected server error.
+- `400 INVALID_PRODUCT_ID`: invalid product ID.
+- `404 PRODUCT_NOT_FOUND`: missing or inactive product.
+- `500 INTERNAL_SERVER_ERROR`: unexpected server error.
 
 ## 6. Shopping Cart — Planned
 
@@ -462,12 +500,22 @@ Every implemented feature must include appropriate tests.
 - Pagination calculations
 - Business rules
 
+The current isolated API tests exercise these behaviors through Express with a
+mocked PostgreSQL pool.
+
 ### Integration Tests
 
 - HTTP endpoint behavior
 - PostgreSQL queries
 - Filtering and sorting
 - Error handling
+
+The current integration test suite connects to a separate Neon `testing` branch.
+
+Some tests execute SQL directly. Others use Supertest to send HTTP requests
+through Express using real PostgreSQL queries.
+
+Integration tests currently perform read-only operations.
 
 ### End-to-End Tests
 
@@ -490,6 +538,37 @@ Complete user workflows once the frontend is implemented.
 - Returns correct pagination metadata.
 - Returns empty results correctly.
 
+The isolated tests use a mocked database. The real-database integration suite
+covers a representative subset of these behaviors.
+
+### Running Tests
+
+From the `backend` directory:
+
+Build TypeScript:
+
+```powershell
+npm run build
+```
+
+Run ordinary tests with coverage:
+
+```powershell
+npx vitest run --coverage
+```
+
+Run PostgreSQL integration tests:
+
+```powershell
+node --env-file=.env node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts
+```
+
+Integration tests require `TEST_DATABASE_URL` to point to the Neon testing
+branch, not production.
+
+The normal CI workflow runs the build and isolated tests without needing Neon
+testing credentials.
+
 ### Future Tests
 
 - Cart operations
@@ -504,24 +583,15 @@ Complete user workflows once the frontend is implemented.
 Each feature will be developed through the relevant database, backend, testing
 and frontend layers.
 
--
-  1. [ ] Product catalog API
--
-  2. [ ] Product catalog frontend
--
-  3. [ ] Product details
--
-  4. [ ] Shopping cart
--
-  5. [ ] Authentication, if required
--
-  6. [ ] Orders and inventory management
--
-  7. [ ] Simulated checkout and payments
--
-  8. [ ] Complete e-commerce testing
--
-  9. [ ] Review future expansion
+1. [x] Product catalog API
+2. [ ] Product catalog frontend
+3. [ ] Product details frontend
+4. [ ] Shopping cart
+5. [ ] Authentication, if required
+6. [ ] Orders and inventory management
+7. [ ] Simulated checkout and payments
+8. [ ] Complete e-commerce testing
+9. [ ] Review future expansion
 
 ## 11. Open Decisions
 
@@ -537,6 +607,10 @@ and frontend layers.
 | Order cancellation rules              | Before orders                 |
 | Payment simulation and statuses       | Before checkout               |
 | Administrative operations             | After core e-commerce         |
+
+Product categories have been defined for the initial sample dataset.
+The database contains an optional `image_url` field, but image storage is
+not yet implemented.
 
 ## 12. Future Expansion
 
@@ -576,11 +650,12 @@ flows exist.
 | 2026-10-12 | Deterministic sorting              | Stable ordering for unchanged datasets       |
 | 2026-10-12 | Separate database documentation    | Avoid duplicated database schema definitions |
 | 2026-10-12 | Simulated payments only            | No real financial transactions               |
+| 2026-10-15 | Product catalog API implemented    | Backend endpoints and database are working   |
+| 2026-10-15 | Separate PostgreSQL testing branch | Test real queries without using production   |
+| 2026-10-15 | Separate Vitest configurations     | Keep ordinary CI tests independent of Neon   |
 
 ---
 
-**Document status:** Working draft.
-
-The Products API has an initial contract ready for implementation.
+**Document status:** Product catalog backend implemented and tested.
 
 Other features will be specified incrementally.
