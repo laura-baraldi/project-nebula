@@ -8,6 +8,7 @@ type Product = {
   description: string;
   price_pawstars: number;
   category: string;
+  image_url: string;
 };
 
 type ProductsResponse = {
@@ -20,7 +21,7 @@ type ProductsResponse = {
 
 async function ProductsContent() {
   // Fetch products from our Express backend.
-  const response = await fetch("http://localhost:4000/api/products?limit=20", {
+  const response = await fetch("http://localhost:4000/api/products?limit=30", {
     cache: "no-store",
   });
 
@@ -53,6 +54,7 @@ async function ProductsContent() {
             description={product.description}
             category={product.category}
             price={product.price_pawstars}
+            imageUrl={product.image_url}
           />
         ))}
       </div>
