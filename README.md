@@ -11,19 +11,27 @@ All purchases and payments are simulated.
 ### Implemented
 
 - Product catalog REST API
-- Product details
-- Category and price filtering
-- Case-insensitive product search
-- Sorting and server-side pagination
+- Product details API
+- Category and price filtering in the backend
+- Case-insensitive product search in the backend
+- Sorting and server-side pagination in the backend
 - PostgreSQL database with 30 sample products
-- Database migrations
-- Automated backend tests
+- Database migrations and product seed
+- Next.js product catalog connected to the Express API
+- Responsive product cards with 30 product images
+- Automated frontend and backend tests
 - PostgreSQL integration tests
-- GitHub Actions for backend build and testing
+- GitHub Actions for frontend and backend checks
+
+### In Development
+
+- Frontend category filtering
+- Frontend product search
+- Frontend sorting and pagination
 
 ### Planned
 
-- Product catalog frontend
+- Individual product detail pages
 - Shopping cart
 - Stock availability and inventory management
 - Orders
@@ -37,28 +45,28 @@ All purchases and payments are simulated.
 
 ## Tech Stack
 
-**Frontend:** Next.js, React, TypeScript, Tailwind CSS (planned)
+**Frontend:** Next.js, React, TypeScript, Tailwind CSS
 
 **Backend:** Node.js, Express, TypeScript
 
 **Database:** PostgreSQL on Neon
 
-**Testing:** Vitest, Supertest
+**Testing:** Vitest, React Testing Library, Supertest
 
 **CI:** GitHub Actions
 
 ## Project Structure
 
-- `frontend/` - Web application (planned)
-- `backend/` - REST API, database migrations, seeds and tests
-- `docs/` - API and database documentation
+- `frontend/` - Next.js application, product catalog, images and frontend tests
+- `backend/` - REST API, database migrations, seeds and backend tests
+- `docs/` - API, database, architecture and frontend design documentation
 
 ## Running the Backend
 
 From the `backend` directory:
 
 ```powershell
-npm ci
+npm.cmd install
 ```
 
 Create a `.env` file inside `backend/` containing the PostgreSQL connection string:
@@ -70,7 +78,7 @@ DATABASE_URL=your_postgresql_connection_string
 Start the development server:
 
 ```powershell
-npm run dev
+npm.cmd run dev
 ```
 
 The API runs at `http://localhost:4000` by default.
@@ -87,16 +95,35 @@ Example:
 GET /api/products?category=clothing&sort=price_asc&page=1&limit=5
 ```
 
-## Testing
+## Running the Frontend
 
-Run the backend build and ordinary tests:
+From the `frontend` directory:
 
 ```powershell
-npm run build
-npx vitest run --coverage
+npm.cmd install
+npm.cmd run dev
+```
+
+The frontend runs at `http://localhost:3000`.
+
+The product catalog is available at `http://localhost:3000/products`.
+
+The Express backend must be running to retrieve product data.
+
+## Testing
+
+### Backend Tests
+
+From the `backend` directory:
+
+```powershell
+npm.cmd run build
+npx.cmd vitest run --coverage
 ```
 
 The ordinary tests use a mocked database connection.
+
+### PostgreSQL Integration Tests
 
 Integration tests use a separate Neon testing branch. Add its connection string to `backend/.env`:
 
@@ -112,15 +139,32 @@ node --env-file=.env node_modules/vitest/vitest.mjs run --config vitest.integrat
 
 The testing database must be separate from production.
 
+### Frontend Tests
+
+From the `frontend` directory:
+
+```powershell
+npm.cmd run test
+npm.cmd run lint
+npx.cmd tsc --noEmit
+npm.cmd run build
+```
+
+The frontend test suite uses mocked API responses and verifies catalog components and product image paths.
+
+GitHub Actions runs frontend and backend checks automatically.
+
 Environment files and credentials must never be committed to Git.
 
 ## Documentation
 
 - [API Design](docs/api-design.md)
+- [Backend Architecture](docs/backend-architecture.md)
 - [Database Design](docs/database-design.md)
+- [Frontend Catalog Design](docs/frontend-catalog-design.md)
 
 ## Status
 
-Product catalog backend API implemented and tested.
+The product catalog backend and initial Next.js frontend are implemented and tested.
 
-Frontend development and additional e-commerce functionality are planned.
+Frontend category filtering, search, sorting and pagination are currently in development.

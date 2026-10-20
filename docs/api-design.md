@@ -170,7 +170,7 @@ Implemented endpoints return errors using this structure:
 Successful responses:
 
 - `200 OK`: successful retrieval or update.
-- `201 Created`: resource created.
+- `201 Created`: created resource.
 - `204 No Content`: successful operation without a response body.
 
 Error responses:
@@ -396,6 +396,27 @@ Response: `200 OK`
   "totalPages": 2
 }
 ```
+
+#### Frontend Catalog Behavior — Planned
+
+The product catalog frontend uses URL query parameters to preserve filtering, sorting and pagination state.
+
+- Category filtering supports the eight existing product categories.
+- Selecting "All Products" removes the `category` parameter.
+- Product search uses the existing `q` parameter.
+- Sorting uses the existing values: `newest`, `price_asc`, `price_desc` and `name_asc`.
+- The frontend requests 20 products per page.
+- Changing category, search query or sorting resets pagination to page 1.
+- Pagination preserves active filters and sorting.
+- Invalid URL parameters are handled before constructing API requests.
+- Empty results display a message and an option to clear filters.
+- The result count comes from the API's `total` field.
+
+Example:
+
+`/products?category=toys&q=moon&sort=price_asc&page=1`
+
+Detailed UI decisions are documented in [Frontend Catalog Design](./frontend-catalog-design.md).
 
 ### GET /api/products/:id
 
