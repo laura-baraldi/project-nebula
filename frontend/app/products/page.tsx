@@ -19,7 +19,7 @@ type ProductsResponse = {
   totalPages: number;
 };
 
-async function ProductsContent() {
+export async function ProductsContent() {
   // Fetch products from our Express backend.
   const response = await fetch("http://localhost:4000/api/products?limit=30", {
     cache: "no-store",
