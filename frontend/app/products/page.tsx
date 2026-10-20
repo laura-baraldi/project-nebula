@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import ProductCard from "@/components/ProductCard";
+import { buildProductQuery, parseProductFilters } from "@/lib/productFilters";
 
 type Product = {
   id: string;
@@ -19,9 +20,26 @@ type ProductsResponse = {
   totalPages: number;
 };
 
-export async function ProductsContent() {
-  // Fetch products from our Express backend.
-  const response = await fetch("http://localhost:4000/api/products?limit=30", {
+type SearchParameters = Record<string, string | string[] | undefined>;
+
+type ProductsPageProps = {
+  searchParams?: Promise<SearchParameters>;
+};
+
+export async function ProductsContent({
+  searchParams,
+}: ProductsPageProps = {}) {
+  // Next.js provides URL search parameters asynchronously.
+  const params = searchParams ? await searchParams : {};
+
+  // Validate URL parameters before using them in an API request.
+  const filters = parseProductFilters(params);
+
+  // Convert validated filters into an encoded backend query string.
+  const query = buildProductQuery(filters);
+
+  // Fetch the matching products from our existing Express API.
+  const response = await fetch(`http://localhost:4000/api/products?${query}`, {
     cache: "no-store",
   });
 
@@ -62,10 +80,10 @@ export async function ProductsContent() {
   );
 }
 
-export default function ProductsPage() {
+export default function ProductsPage({ searchParams }: ProductsPageProps = {}) {
   return (
     <Suspense fallback={<p className="p-8 text-center">Loading products...</p>}>
-      <ProductsContent />
+      <ProductsContent searchParams={searchParams} />
     </Suspense>
   );
 }
