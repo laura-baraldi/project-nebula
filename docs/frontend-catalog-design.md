@@ -26,6 +26,10 @@ The catalog page contains:
 5. A responsive product grid.
 6. Pagination controls.
 
+On desktop, category filters appear in a persistent left sidebar, with the product grid on the right.
+
+On mobile, category filters appear in a collapsible "Filters" menu above the product grid.
+
 The existing `ProductCard` component remains responsible for displaying individual product information.
 
 ## 4. Category Filtering
@@ -116,9 +120,9 @@ Display an appropriate error message when the catalog cannot be loaded.
 
 ### Responsive Design
 
-- Mobile: one-column product grid.
-- Tablet: two-column product grid.
-- Desktop: three-column product grid.
+- Mobile: one-column product grid with a collapsible "Filters" menu.
+- Tablet: two-column product grid with a collapsible "Filters" menu.
+- Desktop: persistent left category sidebar and three-column product grid.
 
 Search, category filters and sorting controls must remain usable on smaller screens.
 

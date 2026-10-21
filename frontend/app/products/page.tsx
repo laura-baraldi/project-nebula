@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import CategoryFilters from "@/components/CategoryFilters";
 import ProductCard from "@/components/ProductCard";
 import { buildProductQuery, parseProductFilters } from "@/lib/productFilters";
 
@@ -29,21 +30,20 @@ type ProductsPageProps = {
 export async function ProductsContent({
   searchParams,
 }: ProductsPageProps = {}) {
-  // Next.js provides URL search parameters asynchronously.
+  // Read the current URL parameters provided by Next.js.
   const params = searchParams ? await searchParams : {};
 
-  // Validate URL parameters before using them in an API request.
+  // Validate filters before passing them to the Express backend.
   const filters = parseProductFilters(params);
 
-  // Convert validated filters into an encoded backend query string.
+  // Build the API query using only validated parameters.
   const query = buildProductQuery(filters);
 
-  // Fetch the matching products from our existing Express API.
+  // Retrieve filtered, sorted and paginated products from Express.
   const response = await fetch(`http://localhost:4000/api/products?${query}`, {
     cache: "no-store",
   });
 
-  // Stop rendering if the API request fails.
   if (!response.ok) {
     throw new Error("Failed to load products");
   }
@@ -60,21 +60,28 @@ export async function ProductsContent({
         Discover extraordinary products from across the galaxy.
       </p>
 
-      <p className="mt-8 text-center text-sm text-violet-700">
-        {data.total} products available
-      </p>
+      {/* Mobile: filters above products. Desktop: sidebar to the left. */}
+      <div className="mx-auto mt-12 grid max-w-6xl gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <CategoryFilters filters={filters} />
 
-      <div className="mx-auto mt-10 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {data.items.map((product) => (
-          <ProductCard
-            key={product.id}
-            name={product.name}
-            description={product.description}
-            category={product.category}
-            price={product.price_pawstars}
-            imageUrl={product.image_url}
-          />
-        ))}
+        <section aria-label="Product results" className="min-w-0">
+          <p className="mb-6 text-sm text-violet-700">
+            {data.total} products available
+          </p>
+
+          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            {data.items.map((product) => (
+              <ProductCard
+                key={product.id}
+                name={product.name}
+                description={product.description}
+                category={product.category}
+                price={product.price_pawstars}
+                imageUrl={product.image_url}
+              />
+            ))}
+          </div>
+        </section>
       </div>
     </main>
   );
