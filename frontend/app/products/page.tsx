@@ -1,6 +1,11 @@
-import { Suspense } from "react";
-
+import CategoryFilters from "@/components/CategoryFilters";
 import ProductCard from "@/components/ProductCard";
+import ProductSearch from "@/components/ProductSearch";
+import ProductSort from "@/components/ProductSort";
+import ProductPagination from "@/components/ProductPagination";
+import ProductEmptyState from "@/components/ProductEmptyState";
+import { buildProductQuery, parseProductFilters } from "@/lib/productFilters";
+import { redirect } from "next/navigation";
 
 type Product = {
   id: string;
@@ -19,18 +24,63 @@ type ProductsResponse = {
   totalPages: number;
 };
 
-export async function ProductsContent() {
-  // Fetch products from our Express backend.
-  const response = await fetch("http://localhost:4000/api/products?limit=30", {
+type SearchParameters = Record<string, string | string[] | undefined>;
+
+type ProductsPageProps = {
+  searchParams?: Promise<SearchParameters>;
+};
+
+export async function ProductsContent({
+  searchParams,
+}: ProductsPageProps = {}) {
+  // Read the current URL parameters provided by Next.js.
+  const params = searchParams ? await searchParams : {};
+
+  // Validate filters before passing them to the Express backend.
+  const filters = parseProductFilters(params);
+
+  // Redirect to a clean URL if the search text was normalized.
+  if (typeof params.q === "string" && params.q !== (filters.q ?? "")) {
+    const cleanParams = new URLSearchParams();
+
+    if (filters.category) {
+      cleanParams.set("category", filters.category);
+    }
+
+    if (filters.q) {
+      cleanParams.set("q", filters.q);
+    }
+
+    if (filters.sort !== "newest") {
+      cleanParams.set("sort", filters.sort);
+    }
+
+    if (filters.page !== 1) {
+      cleanParams.set("page", String(filters.page));
+    }
+
+    const cleanQuery = cleanParams.toString();
+
+    redirect(cleanQuery ? `/products?${cleanQuery}` : "/products");
+  }
+
+  // Build the API query using only validated parameters.
+  const query = buildProductQuery(filters);
+
+  // Retrieve filtered, sorted and paginated products from Express.
+  const response = await fetch(`http://localhost:4000/api/products?${query}`, {
     cache: "no-store",
   });
 
-  // Stop rendering if the API request fails.
   if (!response.ok) {
     throw new Error("Failed to load products");
   }
 
   const data: ProductsResponse = await response.json();
+
+  const isEmpty = data.items.length === 0;
+
+  const isPageOutOfRange = data.total > 0 && data.page > data.totalPages;
 
   return (
     <main className="min-h-screen bg-violet-50 px-6 py-16">
@@ -42,30 +92,52 @@ export async function ProductsContent() {
         Discover extraordinary products from across the galaxy.
       </p>
 
-      <p className="mt-8 text-center text-sm text-violet-700">
-        {data.total} products available
-      </p>
+      <div className="mx-auto mt-12 grid max-w-6xl gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+        {/* Desktop sidebar and mobile category menu. */}
+        <CategoryFilters filters={filters} />
 
-      <div className="mx-auto mt-10 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {data.items.map((product) => (
-          <ProductCard
-            key={product.id}
-            name={product.name}
-            description={product.description}
-            category={product.category}
-            price={product.price_pawstars}
-            imageUrl={product.image_url}
-          />
-        ))}
+        <section aria-label="Product results" className="min-w-0">
+          {/* Search within the catalog, preserving active filters. */}
+          <ProductSearch filters={filters} />
+
+          <div className="my-6 flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm text-violet-700">
+              {data.total} products available
+            </p>
+
+            <ProductSort filters={filters} />
+          </div>
+
+          {isEmpty ? (
+            <ProductEmptyState isPageOutOfRange={isPageOutOfRange} />
+          ) : (
+            <>
+              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                {data.items.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    name={product.name}
+                    description={product.description}
+                    category={product.category}
+                    price={product.price_pawstars}
+                    imageUrl={product.image_url}
+                  />
+                ))}
+              </div>
+
+              <ProductPagination
+                filters={filters}
+                page={data.page}
+                totalPages={data.totalPages}
+              />
+            </>
+          )}
+        </section>
       </div>
     </main>
   );
 }
 
-export default function ProductsPage() {
-  return (
-    <Suspense fallback={<p className="p-8 text-center">Loading products...</p>}>
-      <ProductsContent />
-    </Suspense>
-  );
+export default function ProductsPage({ searchParams }: ProductsPageProps = {}) {
+  return <ProductsContent searchParams={searchParams} />;
 }

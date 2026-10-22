@@ -10,20 +10,37 @@ All purchases and payments are simulated.
 
 ### Implemented
 
+**Backend**
+
 - Product catalog REST API
-- Product details
+- Product details API
 - Category and price filtering
 - Case-insensitive product search
 - Sorting and server-side pagination
 - PostgreSQL database with 30 sample products
-- Database migrations
-- Automated backend tests
+- Database migrations and product seed
+
+**Frontend**
+
+- Next.js product catalog connected to the Express API
+- Responsive product cards with 30 product images
+- Category filtering with a desktop sidebar and collapsible mobile menu
+- Product search with URL normalization
+- Sorting by price, name and creation date
+- Pagination with Previous and Next navigation
+- Shareable URL-based filter state
+- Empty results and out-of-range page handling
+- Loading skeleton and error recovery
+
+**Testing and CI**
+
+- Automated frontend and backend tests
 - PostgreSQL integration tests
-- GitHub Actions for backend build and testing
+- GitHub Actions for frontend and backend checks
 
 ### Planned
 
-- Product catalog frontend
+- Individual product detail pages
 - Shopping cart
 - Stock availability and inventory management
 - Orders
@@ -37,28 +54,28 @@ All purchases and payments are simulated.
 
 ## Tech Stack
 
-**Frontend:** Next.js, React, TypeScript, Tailwind CSS (planned)
+**Frontend:** Next.js, React, TypeScript, Tailwind CSS
 
 **Backend:** Node.js, Express, TypeScript
 
 **Database:** PostgreSQL on Neon
 
-**Testing:** Vitest, Supertest
+**Testing:** Vitest, React Testing Library, Supertest
 
 **CI:** GitHub Actions
 
 ## Project Structure
 
-- `frontend/` - Web application (planned)
-- `backend/` - REST API, database migrations, seeds and tests
-- `docs/` - API and database documentation
+- `frontend/` - Next.js application, product catalog, images and frontend tests
+- `backend/` - REST API, database migrations, seeds and backend tests
+- `docs/` - API, database, architecture and frontend design documentation
 
 ## Running the Backend
 
 From the `backend` directory:
 
 ```powershell
-npm ci
+npm.cmd install
 ```
 
 Create a `.env` file inside `backend/` containing the PostgreSQL connection string:
@@ -70,7 +87,7 @@ DATABASE_URL=your_postgresql_connection_string
 Start the development server:
 
 ```powershell
-npm run dev
+npm.cmd run dev
 ```
 
 The API runs at `http://localhost:4000` by default.
@@ -87,16 +104,53 @@ Example:
 GET /api/products?category=clothing&sort=price_asc&page=1&limit=5
 ```
 
-## Testing
+## Running the Frontend
 
-Run the backend build and ordinary tests:
+From the `frontend` directory:
 
 ```powershell
-npm run build
-npx vitest run --coverage
+npm.cmd install
+npm.cmd run dev
+```
+
+The frontend runs at `http://localhost:3000`.
+
+The product catalog is available at `http://localhost:3000/products`.
+
+The Express backend must be running to retrieve product data.
+
+### Product Catalog
+
+The catalog supports category filtering, product search, sorting and pagination.
+
+Filters are stored in URL query parameters, allowing users to share or bookmark catalog views.
+
+Example:
+
+```text
+/products?category=toys&q=moon&sort=price_asc&page=2
+```
+
+Search queries are normalized by Next.js, which redirects URLs containing unnecessary surrounding whitespace to their clean equivalents.
+
+The catalog includes responsive category navigation, loading skeletons, empty states and error handling.
+
+Filtering, searching, sorting and pagination are performed by the Express backend.
+
+## Testing
+
+### Backend Tests
+
+From the `backend` directory:
+
+```powershell
+npm.cmd run build
+npx.cmd vitest run --coverage
 ```
 
 The ordinary tests use a mocked database connection.
+
+### PostgreSQL Integration Tests
 
 Integration tests use a separate Neon testing branch. Add its connection string to `backend/.env`:
 
@@ -112,15 +166,34 @@ node --env-file=.env node_modules/vitest/vitest.mjs run --config vitest.integrat
 
 The testing database must be separate from production.
 
+### Frontend Tests
+
+From the `frontend` directory:
+
+```powershell
+npm.cmd run test
+npm.cmd run lint
+npx.cmd tsc --noEmit
+npm.cmd run build
+```
+
+The frontend test suite uses mocked API responses and verifies catalog components and product image paths.
+
+GitHub Actions runs frontend and backend checks automatically.
+
 Environment files and credentials must never be committed to Git.
 
 ## Documentation
 
 - [API Design](docs/api-design.md)
+- [Backend Architecture](docs/backend-architecture.md)
 - [Database Design](docs/database-design.md)
+- [Frontend Catalog Design](docs/frontend-catalog-design.md)
 
 ## Status
 
-Product catalog backend API implemented and tested.
+The product catalog backend and frontend are implemented and tested.
 
-Frontend development and additional e-commerce functionality are planned.
+The catalog supports category filtering, search, sorting, pagination, URL-based state management, loading states and error handling.
+
+The next development phase will focus on individual product detail pages and additional e-commerce features.
