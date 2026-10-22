@@ -5,6 +5,7 @@ import ProductSort from "@/components/ProductSort";
 import ProductPagination from "@/components/ProductPagination";
 import ProductEmptyState from "@/components/ProductEmptyState";
 import { buildProductQuery, parseProductFilters } from "@/lib/productFilters";
+import { redirect } from "next/navigation";
 
 type Product = {
   id: string;
@@ -37,6 +38,31 @@ export async function ProductsContent({
 
   // Validate filters before passing them to the Express backend.
   const filters = parseProductFilters(params);
+
+  // Redirect to a clean URL if the search text was normalized.
+  if (typeof params.q === "string" && params.q !== (filters.q ?? "")) {
+    const cleanParams = new URLSearchParams();
+
+    if (filters.category) {
+      cleanParams.set("category", filters.category);
+    }
+
+    if (filters.q) {
+      cleanParams.set("q", filters.q);
+    }
+
+    if (filters.sort !== "newest") {
+      cleanParams.set("sort", filters.sort);
+    }
+
+    if (filters.page !== 1) {
+      cleanParams.set("page", String(filters.page));
+    }
+
+    const cleanQuery = cleanParams.toString();
+
+    redirect(cleanQuery ? `/products?${cleanQuery}` : "/products");
+  }
 
   // Build the API query using only validated parameters.
   const query = buildProductQuery(filters);

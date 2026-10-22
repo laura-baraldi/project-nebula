@@ -9,6 +9,14 @@ vi.mock("next/image", () => ({
     createElement("img", { src, alt }),
 }));
 
+// Simulate Next.js redirect behavior.
+// The real redirect() throws internally to stop rendering.
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT:${url}`);
+  }),
+}));
+
 // Sample products used by the catalog tests.
 const products = [
   {
@@ -303,6 +311,63 @@ describe("ProductsContent", () => {
     );
 
     await expect(ProductsContent()).rejects.toThrow("Network unavailable");
+  });
+
+  // URL normalization tests.
+
+  it("redirects search queries with surrounding whitespace", async () => {
+    const fetchMock = mockApiResponse();
+
+    await expect(
+      ProductsContent({
+        searchParams: Promise.resolve({ q: "   moon   " }),
+      }),
+    ).rejects.toThrow("NEXT_REDIRECT:/products?q=moon");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("removes empty searches from the URL", async () => {
+    const fetchMock = mockApiResponse();
+
+    await expect(
+      ProductsContent({
+        searchParams: Promise.resolve({ q: "   " }),
+      }),
+    ).rejects.toThrow("NEXT_REDIRECT:/products");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves category, sorting and pagination when cleaning the URL", async () => {
+    const fetchMock = mockApiResponse();
+
+    await expect(
+      ProductsContent({
+        searchParams: Promise.resolve({
+          category: "toys",
+          q: "  moon  ",
+          sort: "price_asc",
+          page: "2",
+        }),
+      }),
+    ).rejects.toThrow(
+      "NEXT_REDIRECT:/products?category=toys&q=moon&sort=price_asc&page=2",
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("encodes special characters in normalized search URLs", async () => {
+    const fetchMock = mockApiResponse();
+
+    await expect(
+      ProductsContent({
+        searchParams: Promise.resolve({ q: "  moon & stars  " }),
+      }),
+    ).rejects.toThrow("NEXT_REDIRECT:/products?q=moon+%26+stars");
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
