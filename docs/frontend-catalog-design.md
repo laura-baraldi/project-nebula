@@ -28,7 +28,9 @@ The catalog page contains:
 
 On desktop, category filters appear in a persistent left sidebar, with the product grid on the right.
 
-On mobile, category filters appear in a collapsible "Filters" menu above the product grid.
+On mobile and tablet, category filters appear in a collapsible "Categories" menu above the product grid.
+
+Both the desktop sidebar and the collapsible mobile menu use the same category navigation. Only their presentation differs.
 
 The existing `ProductCard` component remains responsible for displaying individual product information.
 
@@ -65,6 +67,14 @@ Search uses the backend `q` parameter.
 - Search can be combined with category filtering and sorting.
 
 Search is submitted explicitly rather than sending an API request on every keystroke.
+
+Search queries are normalized by Next.js before being sent to the Express API.
+
+If the search query contains leading or trailing whitespace, Next.js redirects to a clean catalog URL.
+
+Empty or whitespace-only searches remove the `q` parameter from the URL.
+
+URL normalization preserves valid category, sorting and pagination parameters.
 
 ## 6. Product Sorting
 
@@ -104,6 +114,16 @@ Invalid or unsupported parameters must be handled safely.
 
 The URL can be shared or bookmarked without losing the selected catalog state.
 
+Search URLs are canonicalized when necessary.
+
+For example:
+
+- `/products?q=+++moon+++` redirects to `/products?q=moon`.
+- `/products?q=+++` redirects to `/products`.
+- `/products?category=toys&q=++moon++` redirects to `/products?category=toys&q=moon`.
+
+The redirect occurs before fetching product data from Express, avoiding an unnecessary API request.
+
 ## 9. User Experience
 
 ### Loading State
@@ -120,9 +140,10 @@ Display an appropriate error message when the catalog cannot be loaded.
 
 ### Responsive Design
 
-- Mobile: one-column product grid with a collapsible "Filters" menu.
-- Tablet: two-column product grid with a collapsible "Filters" menu.
-- Desktop: persistent left category sidebar and three-column product grid.
+- Mobile (below 640px): one-column product grid with a collapsible "Categories" menu.
+- Tablet (640–1023px): two-column product grid with a collapsible "Categories" menu.
+- Medium desktop (1024–1279px): persistent left category sidebar and two-column product grid.
+- Large desktop (1280px and above): persistent left category sidebar and three-column product grid.
 
 Search, category filters and sorting controls must remain usable on smaller screens.
 
