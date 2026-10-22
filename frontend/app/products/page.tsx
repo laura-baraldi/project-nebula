@@ -4,6 +4,7 @@ import CategoryFilters from "@/components/CategoryFilters";
 import ProductCard from "@/components/ProductCard";
 import ProductSearch from "@/components/ProductSearch";
 import ProductSort from "@/components/ProductSort";
+import ProductPagination from "@/components/ProductPagination";
 import { buildProductQuery, parseProductFilters } from "@/lib/productFilters";
 
 type Product = {
@@ -90,6 +91,11 @@ export async function ProductsContent({
               />
             ))}
           </div>
+          <ProductPagination
+            filters={filters}
+            page={data.page}
+            totalPages={data.totalPages}
+          />
         </section>
       </div>
     </main>
