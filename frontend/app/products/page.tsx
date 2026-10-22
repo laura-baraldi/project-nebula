@@ -1,5 +1,3 @@
-import { Suspense } from "react";
-
 import CategoryFilters from "@/components/CategoryFilters";
 import ProductCard from "@/components/ProductCard";
 import ProductSearch from "@/components/ProductSearch";
@@ -115,9 +113,5 @@ export async function ProductsContent({
 }
 
 export default function ProductsPage({ searchParams }: ProductsPageProps = {}) {
-  return (
-    <Suspense fallback={<p className="p-8 text-center">Loading products...</p>}>
-      <ProductsContent searchParams={searchParams} />
-    </Suspense>
-  );
+  return <ProductsContent searchParams={searchParams} />;
 }

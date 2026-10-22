@@ -1,4 +1,4 @@
-import { createElement, Suspense } from "react";
+import { createElement } from "react";
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -308,19 +308,10 @@ describe("ProductsContent", () => {
 
 // Test the page wrapper without rendering the async Server Component.
 describe("ProductsPage", () => {
-  it("wraps ProductsContent in Suspense", () => {
+  it("renders ProductsContent as the page component", () => {
     const element = ProductsPage();
 
-    expect(element.type).toBe(Suspense);
-    expect(element.props.children.type).toBe(ProductsContent);
-  });
-
-  it("provides a loading fallback", () => {
-    const element = ProductsPage();
-
-    render(element.props.fallback);
-
-    expect(screen.getByText("Loading products...")).toBeInTheDocument();
+    expect(element.type).toBe(ProductsContent);
   });
 
   it("forwards URL search parameters to ProductsContent", () => {
@@ -331,6 +322,6 @@ describe("ProductsPage", () => {
 
     const element = ProductsPage({ searchParams });
 
-    expect(element.props.children.props.searchParams).toBe(searchParams);
+    expect(element.props.searchParams).toBe(searchParams);
   });
 });
