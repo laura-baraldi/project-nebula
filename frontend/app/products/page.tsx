@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import CategoryFilters from "@/components/CategoryFilters";
 import ProductCard from "@/components/ProductCard";
+import ProductSearch from "@/components/ProductSearch";
 import { buildProductQuery, parseProductFilters } from "@/lib/productFilters";
 
 type Product = {
@@ -60,12 +61,15 @@ export async function ProductsContent({
         Discover extraordinary products from across the galaxy.
       </p>
 
-      {/* Mobile: filters above products. Desktop: sidebar to the left. */}
       <div className="mx-auto mt-12 grid max-w-6xl gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+        {/* Desktop sidebar and mobile category menu. */}
         <CategoryFilters filters={filters} />
 
         <section aria-label="Product results" className="min-w-0">
-          <p className="mb-6 text-sm text-violet-700">
+          {/* Search within the catalog, preserving active filters. */}
+          <ProductSearch filters={filters} />
+
+          <p className="mb-6 mt-6 text-sm text-violet-700">
             {data.total} products available
           </p>
 
