@@ -188,7 +188,9 @@ describe("CategoryFilters", () => {
     expect(details).toBeInTheDocument();
     expect(details).toHaveClass("lg:hidden");
 
-    expect(within(details!).getByText("Filters")).toBeInTheDocument();
+    expect(
+      within(details!).getByText("Categories", { selector: "summary span" }),
+    ).toBeInTheDocument();
   });
 
   it("renders the desktop sidebar", () => {
@@ -204,24 +206,25 @@ describe("CategoryFilters", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the selected category in the mobile filter summary", () => {
+  it("shows the selected category in the mobile category summary", () => {
     render(
       <CategoryFilters
         filters={{ category: "tech", sort: "newest", page: 1 }}
       />,
     );
 
-    const summary = screen.getByText("Filters").closest("summary");
+    const summary = document.querySelector("details summary");
 
+    expect(summary).toHaveTextContent("Categories");
     expect(summary).toHaveTextContent("Technology");
   });
 
-  it("shows only Filters when no category is selected", () => {
+  it("shows only Categories when no category is selected", () => {
     render(<CategoryFilters filters={{ sort: "newest", page: 1 }} />);
 
-    const summary = screen.getByText("Filters").closest("summary");
+    const summary = document.querySelector("details summary");
 
-    expect(summary).toHaveTextContent("Filters");
+    expect(summary).toHaveTextContent("Categories");
     expect(summary).not.toHaveTextContent("Technology");
   });
 });

@@ -119,7 +119,7 @@ export default function CategoryFilters({ filters }: CategoryFiltersProps) {
       {/* Mobile: collapsible category menu. */}
       <details className="rounded-2xl border border-violet-200 bg-white p-4 shadow-sm lg:hidden">
         <summary className="cursor-pointer font-semibold text-violet-900">
-          <span>Filters</span>
+          <span>Categories</span>
 
           {filters.category && (
             <span className="ml-3 inline-block rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-800">
