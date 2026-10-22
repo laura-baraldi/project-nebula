@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import CategoryFilters from "@/components/CategoryFilters";
 import ProductCard from "@/components/ProductCard";
 import ProductSearch from "@/components/ProductSearch";
+import ProductSort from "@/components/ProductSort";
 import { buildProductQuery, parseProductFilters } from "@/lib/productFilters";
 
 type Product = {
@@ -69,9 +70,13 @@ export async function ProductsContent({
           {/* Search within the catalog, preserving active filters. */}
           <ProductSearch filters={filters} />
 
-          <p className="mb-6 mt-6 text-sm text-violet-700">
-            {data.total} products available
-          </p>
+          <div className="my-6 flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm text-violet-700">
+              {data.total} products available
+            </p>
+
+            <ProductSort filters={filters} />
+          </div>
 
           <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {data.items.map((product) => (
