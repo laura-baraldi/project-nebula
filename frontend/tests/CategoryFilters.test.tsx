@@ -203,4 +203,25 @@ describe("CategoryFilters", () => {
       within(sidebar!).getByRole("heading", { name: "Categories" }),
     ).toBeInTheDocument();
   });
+
+  it("shows the selected category in the mobile filter summary", () => {
+    render(
+      <CategoryFilters
+        filters={{ category: "tech", sort: "newest", page: 1 }}
+      />,
+    );
+
+    const summary = screen.getByText("Filters").closest("summary");
+
+    expect(summary).toHaveTextContent("Technology");
+  });
+
+  it("shows only Filters when no category is selected", () => {
+    render(<CategoryFilters filters={{ sort: "newest", page: 1 }} />);
+
+    const summary = screen.getByText("Filters").closest("summary");
+
+    expect(summary).toHaveTextContent("Filters");
+    expect(summary).not.toHaveTextContent("Technology");
+  });
 });
