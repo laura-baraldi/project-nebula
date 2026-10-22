@@ -10,24 +10,33 @@ All purchases and payments are simulated.
 
 ### Implemented
 
+**Backend**
+
 - Product catalog REST API
 - Product details API
-- Category and price filtering in the backend
-- Case-insensitive product search in the backend
-- Sorting and server-side pagination in the backend
+- Category and price filtering
+- Case-insensitive product search
+- Sorting and server-side pagination
 - PostgreSQL database with 30 sample products
 - Database migrations and product seed
+
+**Frontend**
+
 - Next.js product catalog connected to the Express API
 - Responsive product cards with 30 product images
+- Category filtering with a desktop sidebar and collapsible mobile menu
+- Product search with URL normalization
+- Sorting by price, name and creation date
+- Pagination with Previous and Next navigation
+- Shareable URL-based filter state
+- Empty results and out-of-range page handling
+- Loading skeleton and error recovery
+
+**Testing and CI**
+
 - Automated frontend and backend tests
 - PostgreSQL integration tests
 - GitHub Actions for frontend and backend checks
-
-### In Development
-
-- Frontend category filtering
-- Frontend product search
-- Frontend sorting and pagination
 
 ### Planned
 
@@ -110,6 +119,24 @@ The product catalog is available at `http://localhost:3000/products`.
 
 The Express backend must be running to retrieve product data.
 
+### Product Catalog
+
+The catalog supports category filtering, product search, sorting and pagination.
+
+Filters are stored in URL query parameters, allowing users to share or bookmark catalog views.
+
+Example:
+
+```text
+/products?category=toys&q=moon&sort=price_asc&page=2
+```
+
+Search queries are normalized by Next.js, which redirects URLs containing unnecessary surrounding whitespace to their clean equivalents.
+
+The catalog includes responsive category navigation, loading skeletons, empty states and error handling.
+
+Filtering, searching, sorting and pagination are performed by the Express backend.
+
 ## Testing
 
 ### Backend Tests
@@ -165,6 +192,8 @@ Environment files and credentials must never be committed to Git.
 
 ## Status
 
-The product catalog backend and initial Next.js frontend are implemented and tested.
+The product catalog backend and frontend are implemented and tested.
 
-Frontend category filtering, search, sorting and pagination are currently in development.
+The catalog supports category filtering, search, sorting, pagination, URL-based state management, loading states and error handling.
+
+The next development phase will focus on individual product detail pages and additional e-commerce features.
