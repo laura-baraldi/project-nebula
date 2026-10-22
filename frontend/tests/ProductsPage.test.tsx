@@ -239,6 +239,54 @@ describe("ProductsContent", () => {
     expect(screen.queryAllByRole("article")).toHaveLength(0);
   });
 
+  it("shows an empty state when no products match the search", async () => {
+    mockApiResponse([], 0);
+
+    render(
+      await ProductsContent({
+        searchParams: Promise.resolve({ q: "nonexistent" }),
+      }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "No products found" }),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("heading", { name: "Page not found" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows an out-of-range message for an unavailable page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          items: [],
+          page: 999,
+          limit: 20,
+          total: 30,
+          totalPages: 2,
+        }),
+      }),
+    );
+
+    render(
+      await ProductsContent({
+        searchParams: Promise.resolve({ page: "999" }),
+      }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Page not found" }),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("heading", { name: "No products found" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("throws an error when the API returns an unsuccessful response", async () => {
     vi.stubGlobal(
       "fetch",

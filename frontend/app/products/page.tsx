@@ -5,6 +5,7 @@ import ProductCard from "@/components/ProductCard";
 import ProductSearch from "@/components/ProductSearch";
 import ProductSort from "@/components/ProductSort";
 import ProductPagination from "@/components/ProductPagination";
+import ProductEmptyState from "@/components/ProductEmptyState";
 import { buildProductQuery, parseProductFilters } from "@/lib/productFilters";
 
 type Product = {
@@ -53,6 +54,10 @@ export async function ProductsContent({
 
   const data: ProductsResponse = await response.json();
 
+  const isEmpty = data.items.length === 0;
+
+  const isPageOutOfRange = data.total > 0 && data.page > data.totalPages;
+
   return (
     <main className="min-h-screen bg-violet-50 px-6 py-16">
       <h1 className="text-center text-4xl font-bold text-violet-900">
@@ -79,23 +84,30 @@ export async function ProductsContent({
             <ProductSort filters={filters} />
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-            {data.items.map((product) => (
-              <ProductCard
-                key={product.id}
-                name={product.name}
-                description={product.description}
-                category={product.category}
-                price={product.price_pawstars}
-                imageUrl={product.image_url}
+          {isEmpty ? (
+            <ProductEmptyState isPageOutOfRange={isPageOutOfRange} />
+          ) : (
+            <>
+              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                {data.items.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    name={product.name}
+                    description={product.description}
+                    category={product.category}
+                    price={product.price_pawstars}
+                    imageUrl={product.image_url}
+                  />
+                ))}
+              </div>
+
+              <ProductPagination
+                filters={filters}
+                page={data.page}
+                totalPages={data.totalPages}
               />
-            ))}
-          </div>
-          <ProductPagination
-            filters={filters}
-            page={data.page}
-            totalPages={data.totalPages}
-          />
+            </>
+          )}
         </section>
       </div>
     </main>
