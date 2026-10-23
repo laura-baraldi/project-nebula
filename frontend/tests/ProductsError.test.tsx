@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
-// Mock the transition so retry behavior can be tested synchronously.
+// Mock transitions so retry behavior can be tested synchronously.
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
 
@@ -22,11 +22,10 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
-const testError = new Error("Failed to load products");
 const resetMock = vi.fn();
 
-function renderError() {
-  render(<ProductsError error={testError} reset={resetMock} />);
+function renderError(error = new Error("Failed to load products")) {
+  render(<ProductsError error={error} reset={resetMock} />);
 }
 
 describe("ProductsError", () => {
@@ -44,7 +43,7 @@ describe("ProductsError", () => {
     ).toBeInTheDocument();
 
     expect(
-      screen.getByText(/couldn't load the products right now/i),
+      screen.getByText(/couldn't load this page right now/i),
     ).toBeInTheDocument();
   });
 
@@ -67,20 +66,35 @@ describe("ProductsError", () => {
   });
 
   it("does not show technical error details to users", () => {
-    renderError();
+    renderError(new Error("Internal database connection failed"));
 
     expect(
-      screen.queryByText("Failed to load products"),
+      screen.queryByText("Internal database connection failed"),
     ).not.toBeInTheDocument();
   });
 
   it("hides the decorative icon from assistive technologies", () => {
     const { container } = render(
-      <ProductsError error={testError} reset={resetMock} />,
+      <ProductsError
+        error={new Error("Failed to load products")}
+        reset={resetMock}
+      />,
     );
 
     expect(container.querySelector('[aria-hidden="true"]')).toHaveTextContent(
       "🛸",
     );
+  });
+
+  it("displays the same generic message for product detail errors", () => {
+    renderError(new Error("Failed to load product details"));
+
+    expect(
+      screen.getByText(/couldn't load this page right now/i),
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByText("Failed to load product details"),
+    ).not.toBeInTheDocument();
   });
 });

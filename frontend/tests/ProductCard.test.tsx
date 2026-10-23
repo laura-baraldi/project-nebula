@@ -9,6 +9,7 @@ vi.mock("next/image", () => ({
 }));
 
 const product = {
+  id: "1",
   name: "Moonwarm Bodysuit",
   description: "A thermal bodysuit for little space explorers.",
   category: "clothing",
@@ -19,6 +20,7 @@ const product = {
 describe("ProductCard", () => {
   it("renders the product name as a heading", () => {
     render(<ProductCard {...product} />);
+
     expect(
       screen.getByRole("heading", { name: product.name }),
     ).toBeInTheDocument();
@@ -26,21 +28,25 @@ describe("ProductCard", () => {
 
   it("renders the product description", () => {
     render(<ProductCard {...product} />);
+
     expect(screen.getByText(product.description)).toBeInTheDocument();
   });
 
   it("renders the product category", () => {
     render(<ProductCard {...product} />);
+
     expect(screen.getByText("clothing")).toBeInTheDocument();
   });
 
   it("renders the price in Pawstars", () => {
     render(<ProductCard {...product} />);
+
     expect(screen.getByText("3900 PWS")).toBeInTheDocument();
   });
 
   it("renders the correct product image", () => {
     render(<ProductCard {...product} />);
+
     expect(screen.getByRole("img", { name: product.name })).toHaveAttribute(
       "src",
       product.imageUrl,
@@ -50,6 +56,7 @@ describe("ProductCard", () => {
   it("renders a different product correctly", () => {
     render(
       <ProductCard
+        id="2"
         name="Purrship Mini"
         description="A miniature spacecraft."
         category="travel"
@@ -57,13 +64,36 @@ describe("ProductCard", () => {
         imageUrl="/products/travel/purrship-mini.webp"
       />,
     );
+
     expect(
       screen.getByRole("heading", { name: "Purrship Mini" }),
     ).toBeInTheDocument();
+
     expect(screen.getByText("18500 PWS")).toBeInTheDocument();
+
     expect(screen.getByRole("img", { name: "Purrship Mini" })).toHaveAttribute(
       "src",
       "/products/travel/purrship-mini.webp",
     );
+  });
+
+  it("links to the correct product detail page", () => {
+    render(<ProductCard {...product} />);
+
+    expect(
+      screen.getByRole("link", {
+        name: "View Moonwarm Bodysuit details",
+      }),
+    ).toHaveAttribute("href", "/products/1");
+  });
+
+  it("uses the product ID instead of the name in the URL", () => {
+    render(<ProductCard {...product} id="123" />);
+
+    expect(
+      screen.getByRole("link", {
+        name: "View Moonwarm Bodysuit details",
+      }),
+    ).toHaveAttribute("href", "/products/123");
   });
 });

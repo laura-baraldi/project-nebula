@@ -116,6 +116,7 @@ export async function ProductsContent({
                 {data.items.map((product) => (
                   <ProductCard
                     key={product.id}
+                    id={product.id}
                     name={product.name}
                     description={product.description}
                     category={product.category}
