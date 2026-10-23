@@ -189,6 +189,7 @@ Environment files and credentials must never be committed to Git.
 - [Backend Architecture](docs/backend-architecture.md)
 - [Database Design](docs/database-design.md)
 - [Frontend Catalog Design](docs/frontend-catalog-design.md)
+- [Product Detail Design](docs/product-detail-design.md)
 
 ## Status
 

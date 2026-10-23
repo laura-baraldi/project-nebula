@@ -357,8 +357,6 @@ The current API selects all product columns from PostgreSQL.
 - User-provided values are passed through parameterized SQL queries.
 - Sort values are mapped to a fixed allowlist of SQL ordering expressions.
 
-The two frontend-specific rules above are planned frontend behavior.
-
 #### Example: No Matching Products
 
 Request:
@@ -397,7 +395,7 @@ Response: `200 OK`
 }
 ```
 
-#### Frontend Catalog Behavior — Planned
+#### Frontend Catalog Behavior — Implemented
 
 The product catalog frontend uses URL query parameters to preserve filtering, sorting and pagination state.
 
@@ -605,7 +603,7 @@ Each feature will be developed through the relevant database, backend, testing
 and frontend layers.
 
 1. [x] Product catalog API
-2. [ ] Product catalog frontend
+2. [x] Product catalog frontend
 3. [ ] Product details frontend
 4. [ ] Shopping cart
 5. [ ] Authentication, if required
