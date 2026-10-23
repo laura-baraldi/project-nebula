@@ -19,6 +19,10 @@ All purchases and payments are simulated.
 - Sorting and server-side pagination
 - PostgreSQL database with 30 sample products
 - Database migrations and product seed
+- Individual product detail pages with responsive minimal editorial layout
+- Product information, Pawstars pricing and stock availability
+- Product detail loading skeleton and custom not-found page
+- Shared error boundary with retry functionality
 
 **Frontend**
 
@@ -40,7 +44,6 @@ All purchases and payments are simulated.
 
 ### Planned
 
-- Individual product detail pages
 - Shopping cart
 - Stock availability and inventory management
 - Orders
@@ -193,8 +196,10 @@ Environment files and credentials must never be committed to Git.
 
 ## Status
 
-The product catalog backend and frontend are implemented and tested.
+The product catalog and individual product detail pages are implemented and tested.
 
 The catalog supports category filtering, search, sorting, pagination, URL-based state management, loading states and error handling.
 
-The next development phase will focus on individual product detail pages and additional e-commerce features.
+Product detail pages provide responsive product information, stock availability, loading skeletons, custom not-found handling and shared error recovery.
+
+Future development will focus on additional e-commerce features, including shopping cart, orders and simulated checkout.

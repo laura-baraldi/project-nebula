@@ -92,10 +92,13 @@ No purchasing functionality is included in this feature.
 
 ### Visual Style
 
-- Preserve the existing pastel-purple background.
-- Use rounded cards and consistent typography.
-- Reuse existing product imagery.
-- Maintain adequate text contrast.
+- Minimal editorial design with a pastel-purple background.
+- Large product image on the left and product information on the right on desktop.
+- Product image above the information on smaller screens.
+- Spacious typography, subtle separators and rounded image corners.
+- Stock availability displayed using a colored badge.
+- Reuse existing product images.
+- Maintain adequate text contrast and accessibility.
 
 ## 6. Backend Integration
 
@@ -157,23 +160,33 @@ Display a loading skeleton while product information is being retrieved.
 
 ## 8. Component Architecture
 
-Planned route structure:
+Implemented route structure:
 
 ```text
 frontend/
   app/
     products/
       page.tsx
+      error.tsx
       [id]/
         page.tsx
         loading.tsx
-        error.tsx
         not-found.tsx
 ```
 
-The existing `ProductCard` component will be updated to support navigation to product detail pages.
+The product detail page is a Next.js Server Component.
 
-Additional reusable components will be introduced only when justified.
+Product cards use Next.js Link to navigate to individual detail pages.
+
+The product detail route validates the ID before requesting data from Express.
+
+Invalid IDs and missing or inactive products trigger Next.js notFound().
+
+The product detail loading skeleton follows the same responsive layout as the page.
+
+Unexpected API and network errors are handled by the shared products/error.tsx boundary, which provides a retry action.
+
+A separate [id]/error.tsx is not required.
 
 ## 9. Testing
 
@@ -210,17 +223,18 @@ This feature does not include:
 
 These features may be implemented separately.
 
-## 11. Implementation Plan
+## 11. Implementation Status
 
-1. [ ] Update product cards with detail links.
-2. [ ] Create the dynamic product detail route.
-3. [ ] Integrate the existing product details API.
-4. [ ] Implement responsive product information layout.
-5. [ ] Implement stock availability display.
-6. [ ] Implement not-found, loading and error states.
-7. [ ] Add automated tests.
-8. [ ] Update project documentation.
-9. [ ] Validate frontend checks and open a pull request.
+1. [x] Update product cards with detail links.
+2. [x] Create the dynamic product detail route.
+3. [x] Integrate the existing product details API.
+4. [x] Implement responsive product information layout.
+5. [x] Implement stock availability display.
+6. [x] Implement not-found, loading and error states.
+7. [x] Add automated tests.
+8. [x] Validate frontend tests, coverage, lint, TypeScript and production build.
+9. [x] Update project documentation.
+10. [ ] Open and merge the pull request.
 
 ```
 
