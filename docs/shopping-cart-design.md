@@ -221,15 +221,18 @@ PostgreSQL integration tests will use the separate testing database.
 
 ## 12. Implementation Status
 
-- [ ] Create PostgreSQL migrations.
-- [ ] Implement cart token and cookie handling.
-- [ ] Implement CSRF protection.
+- [x] Create PostgreSQL migrations.
+- [x] Implement cart token generation and hashing.
+- [x] Implement cookie handling helpers.
+- [x] Add database constraint integration tests.
+- [x] Add token and cookie unit tests.
+- [x] Configure GitHub Actions integration tests.
+- [ ] Implement CSRF protection and CORS.
 - [ ] Implement Express cart endpoints.
 - [ ] Implement quantity and stock validation.
 - [ ] Implement price and total calculations.
-- [ ] Implement cart expiration.
+- [ ] Implement cart expiration and renewal.
 - [ ] Implement database transactions.
-- [ ] Add automated tests.
-- [ ] Run backend checks and coverage.
+- [ ] Add cart API tests.
 - [ ] Update API documentation.
 - [ ] Open and merge the pull request.

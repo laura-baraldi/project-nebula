@@ -216,9 +216,11 @@ The database schema is documented separately:
 
 [Database Design](./database-design.md)
 
-The initial database contains one table:
+The database currently contains three tables:
 
-- `products`
+- `products`: product catalog, prices and stock.
+- `carts`: guest shopping carts identified by hashed access tokens.
+- `cart_items`: products and quantities associated with each cart.
 
 The database document describes:
 
@@ -458,21 +460,38 @@ The following example is illustrative.
 - `404 PRODUCT_NOT_FOUND`: missing or inactive product.
 - `500 INTERNAL_SERVER_ERROR`: unexpected server error.
 
-## 6. Shopping Cart — Planned
+## 6. Shopping Cart — In Development
 
-The shopping cart will contain products only.
+The shopping cart supports products only and does not require user authentication.
 
-Planned operations:
+Cart access uses a cryptographically secure random token stored in an
+HttpOnly cookie. PostgreSQL stores only its SHA-256 hash.
 
-- Retrieve cart
-- Add product
-- Update quantity
-- Remove product
-- Calculate total
+The following endpoints have been designed but are not yet implemented:
 
-The exact endpoints and schemas will be defined before implementation.
+| Method | Endpoint                   | Purpose                                |
+| ------ | -------------------------- | -------------------------------------- |
+| GET    | /api/cart                  | Retrieve the current cart              |
+| POST   | /api/cart/items            | Add a product or increase its quantity |
+| PATCH  | /api/cart/items/:productId | Replace an item's quantity             |
+| DELETE | /api/cart/items/:productId | Remove a product                       |
 
-Hotel and experience bookings will not be part of this cart.
+Business rules:
+
+- Carts expire after seven days without a successful modification.
+- Each product can have a maximum quantity of 20.
+- Adding or increasing quantities requires sufficient stock.
+- Existing items remain visible when products become unavailable.
+- Current prices and cart totals are calculated by the backend.
+- Cookie security, CSRF protection and database transactions are required.
+
+The PostgreSQL cart tables, token helpers, cookie helpers and their
+initial automated tests are implemented.
+
+Detailed API request and response schemas will be finalized during
+endpoint implementation.
+
+See [Shopping Cart Design](./shopping-cart-design.md) for the full design.
 
 ## 7. Orders and Checkout — Planned
 
@@ -534,7 +553,9 @@ The current integration test suite connects to a separate Neon `testing` branch.
 Some tests execute SQL directly. Others use Supertest to send HTTP requests
 through Express using real PostgreSQL queries.
 
-Integration tests currently perform read-only operations.
+Integration tests cover product retrieval and shopping cart database
+constraints. Cart database tests use transactions and ROLLBACK to avoid
+persisting test data.
 
 ### End-to-End Tests
 
@@ -585,8 +606,11 @@ node --env-file=.env node_modules/vitest/vitest.mjs run --config vitest.integrat
 Integration tests require `TEST_DATABASE_URL` to point to the Neon testing
 branch, not production.
 
-The normal CI workflow runs the build and isolated tests without needing Neon
-testing credentials.
+GitHub Actions runs the TypeScript build, isolated tests with coverage,
+and PostgreSQL integration tests.
+
+Integration tests use the TEST_DATABASE_URL GitHub Actions secret,
+which points to the dedicated Neon testing database.
 
 ### Future Tests
 
@@ -604,7 +628,7 @@ and frontend layers.
 
 1. [x] Product catalog API
 2. [x] Product catalog frontend
-3. [ ] Product details frontend
+3. [x] Product details frontend
 4. [ ] Shopping cart
 5. [ ] Authentication, if required
 6. [ ] Orders and inventory management

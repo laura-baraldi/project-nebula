@@ -11,12 +11,13 @@ The database stores persistent application data.
 
 ### Initial Scope
 
-The initial database contains one table:
+The current database contains three tables:
 
-- `products`
+- `products`: product catalog, prices and stock.
+- `carts`: persistent guest shopping carts.
+- `cart_items`: products and quantities belonging to carts.
 
-Future tables for carts, orders, payments, hotels and experiences will be
-designed when needed.
+Orders, payments, hotels and experiences remain future features.
 
 ### Database Conventions
 
@@ -86,6 +87,57 @@ stored separately and applied in order.
 | `created_at`     | TIMESTAMPTZ | No       | now()    | Creation timestamp        |
 | `slug`           | TEXT        | No       | None     | Unique URL-friendly name  |
 | `image_url`      | TEXT        | Yes      | NULL     | Product image URL or path |
+
+## Shopping Cart Tables
+
+Migration `004_create_carts.sql` introduces two tables.
+
+### carts
+
+Stores guest cart records.
+
+| Column     | Type        | Constraint / Default    |
+| ---------- | ----------- | ----------------------- |
+| id         | BIGINT      | Identity primary key    |
+| token_hash | CHAR(64)    | NOT NULL, UNIQUE        |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| expires_at | TIMESTAMPTZ | NOT NULL                |
+
+- The original access token is stored in an HttpOnly browser cookie.
+- PostgreSQL stores only its SHA-256 hash.
+- The backend checks whether the cart has expired.
+- PostgreSQL does not automatically delete expired records.
+
+### cart_items
+
+Stores individual products belonging to guest carts.
+
+| Column     | Type        | Constraint / Default    |
+| ---------- | ----------- | ----------------------- |
+| id         | BIGINT      | Identity primary key    |
+| cart_id    | BIGINT      | NOT NULL, foreign key   |
+| product_id | BIGINT      | NOT NULL, foreign key   |
+| quantity   | INTEGER     | NOT NULL, CHECK 1–20    |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+Database constraints:
+
+- `cart_id` references `carts(id)` with `ON DELETE CASCADE`.
+- `product_id` references `products(id)`.
+- `UNIQUE (cart_id, product_id)` prevents duplicate products in a cart.
+- `CHECK (quantity BETWEEN 1 AND 20)` enforces quantity limits.
+- Deleting a cart removes its items but does not delete products.
+
+### Cart Indexes
+
+`carts_expires_at_idx` indexes `carts(expires_at)` to support
+future cleanup of expired carts.
+
+Primary keys and unique constraints also provide indexes.
+
+The cart tables are covered by PostgreSQL integration tests.
 
 ## 3. Constraints and Data Types
 
@@ -367,8 +419,11 @@ product IDs using `BigInt`.
 
 ### Transactions
 
-Transactions will be introduced when several database operations must succeed or
-fail together.
+Transactions are already used in shopping cart database integration tests
+to isolate changes and roll them back.
+
+Cart API write operations will use transactions to preserve data integrity
+and handle concurrent modifications safely.
 
 They will be especially important for:
 
@@ -404,10 +459,33 @@ This migration adds:
 - `slug`: required, unique and validated
 - `image_url`: optional image URL or path
 
-Both migrations have been applied to the project's current Neon databases.
-
 Future migrations must account for existing records when adding required
 columns or modifying constraints.
+
+### Migration 003
+
+`003_update_product_catalog.sql`
+
+This migration updates product catalog content, including descriptions
+and image paths.
+
+### Migration 004
+
+`004_create_carts.sql`
+
+This migration creates:
+
+- The `carts` table.
+- The `cart_items` table.
+- Cart token uniqueness.
+- Quantity and foreign key constraints.
+- Cascading deletion of cart items.
+- The index on cart expiration.
+
+Migration 004 has been applied to both the normal development database
+and the dedicated Neon testing database.
+
+Its constraints are verified by automated PostgreSQL integration tests.
 
 ### Documentation vs Migrations
 
@@ -464,11 +542,11 @@ remain to be decided.
 
 ## 10. Future Database Expansion
 
+The cart tables (`carts` and `cart_items`) are already implemented.
+
 Future e-commerce tables may include:
 
-- `users`
-- `carts`
-- `cart_items`
+- `users`, if customer accounts are introduced
 - `orders`
 - `order_items`
 - `payments`
@@ -483,7 +561,6 @@ corresponding features are implemented.
 
 ---
 
-**Document status:** Initial products schema implemented and documented.
+**Document status:** Product and guest cart database schemas implemented.
 
-The current two migrations have been applied. Future database structures
-will be added incrementally.
+Migrations 001–004 are present. The cart API is still under development.
