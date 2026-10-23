@@ -96,7 +96,7 @@ describe("ProductDetailPage", () => {
 
     render(await ProductDetailPage(pageProps("12")));
 
-    expect(screen.getByText("travel")).toBeInTheDocument();
+    expect(screen.getAllByText("travel")).toHaveLength(2);
   });
 
   it("renders the product price in Pawstars", async () => {
