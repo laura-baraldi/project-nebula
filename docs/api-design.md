@@ -462,36 +462,153 @@ The following example is illustrative.
 
 ## 6. Shopping Cart — In Development
 
-The shopping cart supports products only and does not require user authentication.
+The shopping cart supports products only, without user authentication.
 
-Cart access uses a cryptographically secure random token stored in an
-HttpOnly cookie. PostgreSQL stores only its SHA-256 hash.
+Guest carts are identified using a cryptographically secure random token
+stored in an HttpOnly cookie. PostgreSQL stores only its SHA-256 hash.
 
-The following endpoints have been designed but are not yet implemented:
+### Endpoint Status
 
-| Method | Endpoint                   | Purpose                                |
-| ------ | -------------------------- | -------------------------------------- |
-| GET    | /api/cart                  | Retrieve the current cart              |
-| POST   | /api/cart/items            | Add a product or increase its quantity |
-| PATCH  | /api/cart/items/:productId | Replace an item's quantity             |
-| DELETE | /api/cart/items/:productId | Remove a product                       |
+| Method | Endpoint                   | Status                 |
+| ------ | -------------------------- | ---------------------- |
+| GET    | /api/cart                  | Implemented and tested |
+| POST   | /api/cart/items            | Implemented and tested |
+| PATCH  | /api/cart/items/:productId | Planned                |
+| DELETE | /api/cart/items/:productId | Planned                |
 
-Business rules:
+### GET /api/cart
 
-- Carts expire after seven days without a successful modification.
-- Each product can have a maximum quantity of 20.
-- Adding or increasing quantities requires sufficient stock.
-- Existing items remain visible when products become unavailable.
-- Current prices and cart totals are calculated by the backend.
-- Cookie security, CSRF protection and database transactions are required.
+Returns the current guest cart.
 
-The PostgreSQL cart tables, token helpers, cookie helpers and their
-initial automated tests are implemented.
+- No cookie, unknown token or expired cart: returns an empty cart.
+- Does not create a cart or renew its expiration.
+- Uses current product prices from PostgreSQL.
+- Retains inactive and out-of-stock products, marking them unavailable.
 
-Detailed API request and response schemas will be finalized during
-endpoint implementation.
+Success: `200 OK`
 
-See [Shopping Cart Design](./shopping-cart-design.md) for the full design.
+Example response:
+
+```json
+{
+  "items": [
+    {
+      "product_id": "1",
+      "name": "Moonwarm Bodysuit",
+      "image_url": null,
+      "price_pawstars": 3900,
+      "quantity": 2,
+      "subtotal_pawstars": 7800,
+      "is_available": true
+    }
+  ],
+  "total_pawstars": 7800
+}
+```
+
+An empty cart returns:
+
+```json
+{
+  "items": [],
+  "total_pawstars": 0
+}
+```
+
+Unexpected database errors return `500 INTERNAL_SERVER_ERROR`.
+
+### POST /api/cart/items
+
+Adds a product to a guest cart or increases its existing quantity.
+
+Request headers:
+
+- `Content-Type: application/json`
+- `Origin`: must match the configured trusted frontend origin.
+- `Cookie: cart_token=...` is optional for an existing cart.
+
+Example request body:
+
+```json
+{
+  "product_id": "1",
+  "quantity": 2
+}
+```
+
+Validation:
+
+- The JSON body must contain exactly `product_id` and `quantity`.
+- `product_id` must be a string representing a valid positive PostgreSQL BIGINT.
+- `quantity` must be an integer between 1 and 20.
+- Frontend-provided prices or unexpected fields are rejected.
+- The product must exist and be active.
+- The resulting quantity cannot exceed 20 or available stock.
+
+Behavior:
+
+- Without an active cart, creates a cart only after successful validation.
+- With an active cart, adds the product or increases its quantity.
+- Uses a PostgreSQL transaction for atomic modifications.
+- Locks relevant database rows during updates.
+- Successful additions renew the cart expiration to seven days.
+- Successful responses set or renew an HttpOnly, SameSite=Lax cart cookie.
+- Secure cookies are enabled in production.
+- Failed additions do not set a cart cookie.
+- Adding products does not decrease or reserve stock.
+- Response totals always use current database prices.
+
+Success responses:
+
+- `201 Created`: a new cart was created.
+- `200 OK`: an existing cart was updated.
+
+Both return the updated cart using the same JSON structure as GET.
+
+Error responses:
+
+| HTTP | Error code              | Meaning                              |
+| ---- | ----------------------- | ------------------------------------ |
+| 400  | VALIDATION_ERROR        | Invalid body, product ID or quantity |
+| 403  | FORBIDDEN_ORIGIN        | Untrusted or missing Origin          |
+| 404  | PRODUCT_NOT_FOUND       | Missing or inactive product          |
+| 409  | QUANTITY_LIMIT_EXCEEDED | Resulting quantity exceeds 20        |
+| 409  | INSUFFICIENT_STOCK      | Not enough available stock           |
+| 415  | UNSUPPORTED_MEDIA_TYPE  | Request is not JSON                  |
+| 500  | INTERNAL_SERVER_ERROR   | Unexpected server failure            |
+
+Example error:
+
+```json
+{
+  "error": {
+    "code": "INSUFFICIENT_STOCK",
+    "message": "Not enough stock available."
+  }
+}
+```
+
+### Security and Testing
+
+- CORS is configured through the `cors` middleware.
+- State-changing cart requests require the trusted Origin.
+- PostgreSQL queries use parameterized SQL.
+- Token and cookie handling have automated unit tests.
+- GET and POST have isolated HTTP tests.
+- GET and POST have integration tests against the Neon testing database.
+- POST integration tests cover transactions, quantity limits, stock,
+  expiration renewal and concurrent additions.
+
+### Planned Operations
+
+PATCH will replace an existing item's quantity.
+
+DELETE will remove an item without deleting the cart itself.
+
+See [Shopping Cart Design](./shopping-cart-design.md) for the full
+business rules and implementation plan.
+
+````
 
 ## 7. Orders and Checkout — Planned
 
@@ -589,7 +706,7 @@ Build TypeScript:
 
 ```powershell
 npm run build
-```
+````
 
 Run ordinary tests with coverage:
 

@@ -227,12 +227,16 @@ PostgreSQL integration tests will use the separate testing database.
 - [x] Add database constraint integration tests.
 - [x] Add token and cookie unit tests.
 - [x] Configure GitHub Actions integration tests.
-- [ ] Implement CSRF protection and CORS.
-- [ ] Implement Express cart endpoints.
-- [ ] Implement quantity and stock validation.
-- [ ] Implement price and total calculations.
-- [ ] Implement cart expiration and renewal.
-- [ ] Implement database transactions.
-- [ ] Add cart API tests.
-- [ ] Update API documentation.
+- [x] Implement CSRF origin protection and CORS.
+- [x] Implement GET /api/cart.
+- [x] Implement POST /api/cart/items.
+- [x] Implement POST quantity and stock validation.
+- [x] Implement cart price and total calculations.
+- [x] Implement seven-day cart expiration checks and POST renewal.
+- [x] Implement POST database transactions.
+- [x] Add GET and POST API unit and integration tests.
+- [x] Document GET and POST API contracts.
+- [ ] Implement PATCH /api/cart/items/:productId.
+- [ ] Implement DELETE /api/cart/items/:productId.
+- [ ] Complete remaining cart API tests and documentation.
 - [ ] Open and merge the pull request.
