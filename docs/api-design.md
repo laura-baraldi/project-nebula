@@ -1,138 +1,47 @@
-# API Design: Project Nebula
+# API Design — Project Nebula
 
-> Living document. Only what is decided or being built right now is described in
-> detail. Future features are documented when their development begins. Last
-> updated: 2026-10-15
+> API reference and current implementation status. Updated: 2026-10-25.
+> Detailed database schema: [Database Design](./database-design.md). Detailed cart rules: [Shopping Cart Design](./shopping-cart-design.md).
 
 ## 1. Overview
 
-Project Nebula is a fictional full-stack e-commerce platform selling products
-from a planet inhabited by hairless cats.
+Project Nebula is a fictional e-commerce platform for products from a planet inhabited by hairless cats. Orders and payments will be simulated. The currency is the **Pawstar (PWS)**; prices are whole integers, with no fractional units or currency conversion.
 
-The project exists to practice API design, backend development, SQL, testing and
-frontend-backend communication.
+| Layer    | Technology                               | Responsibility                       |
+| -------- | ---------------------------------------- | ------------------------------------ |
+| Frontend | Next.js, React, TypeScript               | UI and HTTP requests                 |
+| Backend  | Node.js, Express, TypeScript             | REST API, validation, business logic |
+| Database | PostgreSQL (Neon), plain SQL             | Data persistence and constraints     |
+| Testing  | Vitest, Supertest, Neon `testing` branch | Isolated and real-database tests     |
 
-All purchases and payments are simulated.
+The frontend and backend are separate. Only Express accesses PostgreSQL; database credentials must never reach the frontend. Local development uses frontend `http://localhost:3000` and API `http://localhost:4000`.
 
-The planet's currency is the **Pawstar** (plural: Pawstars), abbreviated as PWS.
+**Implemented:** product catalog API and frontend; guest cart backend (GET, POST, PATCH, DELETE). **Planned:** cart frontend, orders, inventory checkout, simulated payments and any authentication required later. Hotels and Experiences are explicitly outside the current scope.
 
-### Technology Stack
+## 2. API Conventions
 
-| Layer       | Choice                         | Why                                                  |
-| ----------- | ------------------------------ | ---------------------------------------------------- |
-| Frontend    | Next.js + React + TypeScript   | Routing, React practice and server-rendered pages    |
-| Backend     | Node.js + Express + TypeScript | Practice designing REST API contracts                |
-| Database    | PostgreSQL (Neon)              | Practice SQL and relational databases without an ORM |
-| Development | Local only                     | Focus on learning rather than deployment             |
-
-- Frontend: `http://localhost:3000` (planned)
-- Backend: `http://localhost:4000`
-
-### Architecture Rules
-
-- Frontend and backend are separate applications.
-- The frontend communicates with Express through HTTP.
-- Next.js does not query PostgreSQL directly.
-- Express handles input validation and business logic.
-- PostgreSQL enforces data integrity constraints.
-- SQL queries are written without an ORM initially.
-- Database credentials are never exposed to the frontend.
-
-## 2. Project Scope
-
-### Initial Version: E-commerce
-
-The application will support:
-
-- Product catalog
-- Product details
-- Product categories
-- Search and filtering
-- Sorting and pagination
-- Shopping cart
-- Stock availability
-- Orders
-- Simulated checkout and payments
-
-The product catalog backend API is implemented. The remaining e-commerce
-features will be developed incrementally.
-
-### Future Features
-
-Not included in the initial version:
-
-- Hotel catalog and room reservations
-- Experience catalog and bookings
-- Date-based availability
-- Unified cart for different resource types
-
-These features will be designed separately when needed.
-
-## 3. API Conventions
-
-### Base Path
-
-`/api`
-
-Requests and responses use JSON.
-
-### Naming
-
-- Resource fields use `snake_case`.
-- Pagination metadata uses `camelCase`.
-- Resource IDs are positive integers stored as PostgreSQL `BIGINT`.
-- Product IDs are returned as JSON strings to avoid JavaScript precision loss.
-
-### Currency
-
-All prices are expressed in whole Pawstars (PWS).
-
-- No cents.
-- No fractional units.
-- No floating-point prices.
-
-Example:
+- Base path: `/api`. Request and response bodies use JSON where applicable.
+- Resource fields use `snake_case`; pagination metadata uses `camelCase` (`totalPages`).
+- Product IDs are positive PostgreSQL `BIGINT` values represented as **strings** in JSON, avoiding JavaScript precision loss. Valid IDs cannot exceed `9223372036854775807`.
+- Prices are integer Pawstars (`price_pawstars`), not floating-point amounts.
+- Return structured errors, never database credentials, stack traces or other internal details:
 
 ```json
 {
-  "price_pawstars": 3900
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid input."
+  }
 }
 ```
 
-Only one currency is supported initially.
+Typical HTTP statuses: `200` success, `201` created, `204` no response body (where applicable), `400` invalid input, `401` unauthenticated (future protected endpoints), `403` forbidden/origin rejected, `404` not found, `409` business conflict, `415` unsupported content type, `429` rate-limited (future), `500` unexpected error. Individual endpoint sections specify actual implemented codes.
 
-No currency column is required.
+### Pagination and sorting
 
-### Pagination
+List endpoints filter first, then sort, then paginate. Defaults are `page=1`, `limit=20`; `limit` must be 1–100 and `page` a positive decimal integer. Invalid values, unsafe offsets, and unsupported sort options return `400`. SQL offset is `(page - 1) * limit`; sorting uses `id` as a deterministic tiebreaker. Concurrent inserts/deletes may still shift pages.
 
-List endpoints use server-side pagination.
-
-| Parameter | Default           | Validation                |
-| --------- | ----------------- | ------------------------- |
-| `page`    | 1                 | Positive decimal integer  |
-| `limit`   | 20                | Integer between 1 and 100 |
-| `sort`    | Endpoint-specific | Allowed values only       |
-
-The backend applies operations in this order:
-
-1. Filtering
-2. Sorting
-3. Pagination
-
-SQL offset:
-
-`(page - 1) * limit`
-
-Each sorting method includes `id` as a unique tiebreaker.
-
-This provides deterministic ordering for an unchanged dataset, but does not
-prevent page shifts if records are inserted or deleted between requests.
-
-Invalid pagination parameters return HTTP 400.
-
-Page and offset values must remain within JavaScript's safe integer range.
-
-### Standard List Response
+Standard list format:
 
 ```json
 {
@@ -144,141 +53,44 @@ Page and offset values must remain within JavaScript's safe integer range.
 }
 ```
 
-- `items`: records for the requested page.
-- `page`: requested page number.
-- `limit`: maximum records per page.
-- `total`: matching records before pagination.
-- `totalPages`: `ceil(total / limit)`.
+`total` counts all matching records before pagination; `totalPages` is `ceil(total / limit)`, or zero when no results match. Valid pages beyond the end return `200` with `items: []` rather than an error.
 
-When `total` is zero, `totalPages` is zero.
+## 3. Data and Product Visibility
 
-### Standard Error Response
+Current tables: `products`, `carts`, and `cart_items`. SQL migrations define the schema, constraints and indexes; see [Database Design](./database-design.md).
 
-Implemented endpoints return errors using this structure:
+Public product endpoints show only `is_active = TRUE` products. Inactive products are excluded from lists and return `404` on the public detail endpoint. Already-added cart items remain visible even if their product later becomes inactive or out of stock; they are flagged unavailable.
 
-```json
-{
-  "error": {
-    "code": "INVALID_PAGINATION",
-    "message": "Page must be a positive integer and limit must be between 1 and 100."
-  }
-}
-```
+## 4. Products API — Implemented
 
-### HTTP Status Codes
+### GET `/api/products`
 
-Successful responses:
+Returns a paginated list of active products. All filters combine with **AND**.
 
-- `200 OK`: successful retrieval or update.
-- `201 Created`: created resource.
-- `204 No Content`: successful operation without a response body.
+| Query parameter          | Default   | Behavior                                                                           |
+| ------------------------ | --------- | ---------------------------------------------------------------------------------- |
+| `category`               | none      | Exact category match after trimming                                                |
+| `q`                      | none      | Case-insensitive name search; max 100 trimmed characters                           |
+| `min_price`, `max_price` | none      | Inclusive Pawstar price range; nonnegative integers, at most 2147483647, min ≤ max |
+| `sort`                   | `newest`  | `newest`, `price_asc`, `price_desc`, `name_asc`                                    |
+| `page`, `limit`          | `1`, `20` | Pagination rules above                                                             |
 
-Error responses:
+Sort order:
 
-| HTTP Status | Application Code      | Meaning                           |
-| ----------- | --------------------- | --------------------------------- |
-| 400         | VALIDATION_ERROR      | Unknown or repeated parameters    |
-| 400         | INVALID_PAGINATION    | Invalid page, limit or offset     |
-| 400         | INVALID_SORT          | Invalid sorting option            |
-| 400         | INVALID_PRICE_RANGE   | Invalid price range               |
-| 400         | INVALID_PRODUCT_ID    | Invalid product ID                |
-| 401         | UNAUTHORIZED          | Missing or invalid authentication |
-| 403         | FORBIDDEN             | Insufficient permissions          |
-| 404         | PRODUCT_NOT_FOUND     | Missing or inactive product       |
-| 409         | CONFLICT              | Business rule conflict            |
-| 429         | RATE_LIMITED          | Too many requests                 |
-| 500         | INTERNAL_SERVER_ERROR | Unexpected server error           |
-
-Only the codes relevant to the currently implemented product endpoints are
-implemented. Authentication, conflicts and rate limiting are planned for later
-features.
-
-Application error codes are custom identifiers returned in JSON, not HTTP reason
-phrases.
-
-Unexpected errors must not expose stack traces, credentials or other sensitive
-internal information.
-
-### Resource Visibility
-
-Public product endpoints return only products where `is_active = TRUE`.
-
-Inactive products are excluded from public lists.
-
-Requesting an inactive product through the public detail endpoint returns
-`404 Not Found`.
-
-Future administrative endpoints may follow different rules.
-
-## 4. Database Design
-
-The database schema is documented separately:
-
-[Database Design](./database-design.md)
-
-The database currently contains three tables:
-
-- `products`: product catalog, prices and stock.
-- `carts`: guest shopping carts identified by hashed access tokens.
-- `cart_items`: products and quantities associated with each cart.
-
-The database document describes:
-
-- Column names and data types
-- Primary keys
-- Constraints and default values
-- Indexes
-- Database design decisions
-
-Schema changes are managed through SQL migration files.
-
-The product table and its initial migrations have been applied to Neon.
-
-## 5. Products API
-
-The following endpoints are implemented.
-
-### GET /api/products
-
-Retrieve a paginated list of active products.
-
-#### Query Parameters
-
-| Parameter   | Default  | Description                         |
-| ----------- | -------- | ----------------------------------- |
-| `category`  | none     | Exact category match after trimming |
-| `q`         | none     | Case-insensitive name search        |
-| `min_price` | none     | Minimum price in Pawstars           |
-| `max_price` | none     | Maximum price in Pawstars           |
-| `sort`      | `newest` | Sorting method                      |
-| `page`      | 1        | Page number                         |
-| `limit`     | 20       | Results per page                    |
-
-Multiple filters are combined using AND.
-
-Price filters are inclusive.
-
-#### Allowed Sorting Values
-
-| Value        | SQL ORDER BY                   |
+| Value        | SQL ordering                   |
 | ------------ | ------------------------------ |
 | `newest`     | `created_at DESC, id DESC`     |
 | `price_asc`  | `price_pawstars ASC, id ASC`   |
 | `price_desc` | `price_pawstars DESC, id DESC` |
 | `name_asc`   | `name ASC, id ASC`             |
 
-Default: `newest`.
+Unknown or repeated parameters are rejected (`400`). Empty `category` and `q` act as absent filters; whitespace is trimmed. Numeric values must be valid decimal integers in supported safe ranges. Invalid inputs are rejected, not silently repaired. Parameterized SQL handles filters, and sort expressions come from a fixed allowlist.
 
-Filtering, sorting and pagination are performed by PostgreSQL.
-
-#### Example Request
+Example request:
 
 `GET /api/products?category=clothing&sort=price_asc&page=1&limit=20`
 
-#### Success Response: 200 OK
-
-The following example is illustrative. Actual product values depend on the
-database contents.
+Example `200` response (illustrative values):
 
 ```json
 {
@@ -294,200 +106,39 @@ database contents.
       "created_at": "2026-10-12T10:00:00.000Z",
       "slug": "sphynx-sweater",
       "image_url": null
-    },
-    {
-      "id": "2",
-      "name": "Cosmic Blanket",
-      "description": "A warm blanket for interstellar naps.",
-      "price_pawstars": 4500,
-      "category": "clothing",
-      "stock_quantity": 8,
-      "is_active": true,
-      "created_at": "2026-10-12T10:00:00.000Z",
-      "slug": "cosmic-blanket",
-      "image_url": null
     }
   ],
   "page": 1,
   "limit": 20,
-  "total": 2,
+  "total": 1,
   "totalPages": 1
 }
 ```
 
-The current API selects all product columns from PostgreSQL.
+A category or search with no results returns `200`, `items: []`, `total: 0`, `totalPages: 0`. A page beyond the end likewise returns `200` with an empty `items` array while preserving the requested page and actual totals.
 
-#### Validation
+Errors: `400 VALIDATION_ERROR` (unknown/repeated parameters or invalid search), `400 INVALID_PAGINATION`, `400 INVALID_SORT`, `400 INVALID_PRICE_RANGE`, `500 INTERNAL_SERVER_ERROR`.
 
-- `page` must be a positive decimal integer.
-- `limit` must be an integer between 1 and 100.
-- `min_price` and `max_price` must be non-negative integers.
-- Price values cannot exceed PostgreSQL INTEGER's maximum of 2147483647.
-- `min_price` cannot exceed `max_price`.
-- `sort` must be an allowed value.
-- Unknown query parameters return `400`.
-- Repeated query parameters return `400`.
-- `q` must contain at most 100 characters after trimming.
-- Leading and trailing whitespace in `q` and `category` is trimmed.
-- Empty `q` and `category` values are treated as absent filters.
-- Numeric parameters must contain valid decimal integer representations.
-- Parsed numeric values must be within supported safe ranges.
-- Invalid inputs are rejected rather than silently corrected.
+The implemented catalog frontend preserves `category`, `q`, `sort`, and `page` in URL parameters; changing filters or sorting resets the page to 1. It requests 20 products per page, validates URL inputs, uses `total` for result counts, and offers a clear-filters action for empty results. The existing eight categories are supported. See [Frontend Catalog Design](./frontend-catalog-design.md).
 
-#### Errors
+### GET `/api/products/:id`
 
-- `400 VALIDATION_ERROR`: unknown or repeated parameters, or invalid search length.
-- `400 INVALID_PAGINATION`: invalid page, limit or offset.
-- `400 INVALID_SORT`: unsupported sorting option.
-- `400 INVALID_PRICE_RANGE`: invalid price filters.
-- `500 INTERNAL_SERVER_ERROR`: unexpected server error.
+Returns one active product using the product object shape shown above (without pagination metadata). The path ID must be a positive decimal integer **without leading zeros**, within signed PostgreSQL `BIGINT` range.
 
-#### Business Rules
+Responses: `200` product; `400 INVALID_PRODUCT_ID` for invalid ID; `404 PRODUCT_NOT_FOUND` for missing or inactive product; `500 INTERNAL_SERVER_ERROR` for unexpected failure.
 
-- Only active products are returned.
-- Filters are combined using AND.
-- Filtering happens before sorting and pagination.
-- SQL offset is calculated as `(page - 1) * limit`.
-- `total` counts matching products before pagination.
-- `totalPages` is calculated as `ceil(total / limit)`.
-- A valid page beyond available results returns `200` with an empty `items`
-  array.
-- A category or search with no matches returns `200` with an empty `items`
-  array.
-- The frontend resets `page` to 1 when filters or sorting change.
-- The frontend keeps filters, sorting and page in URL query parameters.
-- User-provided values are passed through parameterized SQL queries.
-- Sort values are mapped to a fixed allowlist of SQL ordering expressions.
+## 5. Guest Shopping Cart API — Implemented (Backend)
 
-#### Example: No Matching Products
+No login is needed. Cart content lives in PostgreSQL; the browser holds a random `cart_token` in an **HttpOnly**, **SameSite=Lax** cookie (`Secure` in production). Only the token's SHA-256 hash is stored in PostgreSQL. Without the cookie, another browser/device cannot retrieve the guest cart.
 
-Request:
+| Method   | Endpoint                     | Purpose                              | Success                             |
+| -------- | ---------------------------- | ------------------------------------ | ----------------------------------- |
+| `GET`    | `/api/cart`                  | Read cart                            | `200`                               |
+| `POST`   | `/api/cart/items`            | Add an item or increase its quantity | `201` new cart, `200` existing cart |
+| `PATCH`  | `/api/cart/items/:productId` | Replace existing item quantity       | `200`                               |
+| `DELETE` | `/api/cart/items/:productId` | Remove one item                      | `200`                               |
 
-`GET /api/products?category=nonexistent`
-
-Response: `200 OK`
-
-```json
-{
-  "items": [],
-  "page": 1,
-  "limit": 20,
-  "total": 0,
-  "totalPages": 0
-}
-```
-
-#### Example: Page Beyond Available Results
-
-Request:
-
-`GET /api/products?page=50&limit=20`
-
-Assuming 35 products match:
-
-Response: `200 OK`
-
-```json
-{
-  "items": [],
-  "page": 50,
-  "limit": 20,
-  "total": 35,
-  "totalPages": 2
-}
-```
-
-#### Frontend Catalog Behavior — Implemented
-
-The product catalog frontend uses URL query parameters to preserve filtering, sorting and pagination state.
-
-- Category filtering supports the eight existing product categories.
-- Selecting "All Products" removes the `category` parameter.
-- Product search uses the existing `q` parameter.
-- Sorting uses the existing values: `newest`, `price_asc`, `price_desc` and `name_asc`.
-- The frontend requests 20 products per page.
-- Changing category, search query or sorting resets pagination to page 1.
-- Pagination preserves active filters and sorting.
-- Invalid URL parameters are handled before constructing API requests.
-- Empty results display a message and an option to clear filters.
-- The result count comes from the API's `total` field.
-
-Example:
-
-`/products?category=toys&q=moon&sort=price_asc&page=1`
-
-Detailed UI decisions are documented in [Frontend Catalog Design](./frontend-catalog-design.md).
-
-### GET /api/products/:id
-
-Retrieve a single active product.
-
-#### Path Parameters
-
-- `id`: required positive decimal integer without leading zeroes.
-- IDs must fit within PostgreSQL's signed BIGINT range.
-
-#### Success Response: 200 OK
-
-The following example is illustrative.
-
-```json
-{
-  "id": "1",
-  "name": "Sphynx Sweater",
-  "description": "Warm, because they are not.",
-  "price_pawstars": 3900,
-  "category": "clothing",
-  "stock_quantity": 14,
-  "is_active": true,
-  "created_at": "2026-10-12T10:00:00.000Z",
-  "slug": "sphynx-sweater",
-  "image_url": null
-}
-```
-
-#### Validation
-
-- `id` must be a valid positive integer.
-- Invalid ID formats return `400`.
-- Inactive products are not publicly accessible.
-- IDs must be processed without numeric precision loss.
-- The maximum supported ID is `9223372036854775807`.
-
-#### Errors
-
-- `400 INVALID_PRODUCT_ID`: invalid product ID.
-- `404 PRODUCT_NOT_FOUND`: missing or inactive product.
-- `500 INTERNAL_SERVER_ERROR`: unexpected server error.
-
-## 6. Shopping Cart — In Development
-
-The shopping cart supports products only, without user authentication.
-
-Guest carts are identified using a cryptographically secure random token
-stored in an HttpOnly cookie. PostgreSQL stores only its SHA-256 hash.
-
-### Endpoint Status
-
-| Method | Endpoint                   | Status                 |
-| ------ | -------------------------- | ---------------------- |
-| GET    | /api/cart                  | Implemented and tested |
-| POST   | /api/cart/items            | Implemented and tested |
-| PATCH  | /api/cart/items/:productId | Planned                |
-| DELETE | /api/cart/items/:productId | Planned                |
-
-### GET /api/cart
-
-Returns the current guest cart.
-
-- No cookie, unknown token or expired cart: returns an empty cart.
-- Does not create a cart or renew its expiration.
-- Uses current product prices from PostgreSQL.
-- Retains inactive and out-of-stock products, marking them unavailable.
-
-Success: `200 OK`
-
-Example response:
+Successful operations return the **updated cart** in this shape (example values):
 
 ```json
 {
@@ -506,316 +157,106 @@ Example response:
 }
 ```
 
-An empty cart returns:
+An empty cart returns `{"items":[],"total_pawstars":0}`. Backend prices and totals always reflect current database prices; frontend-provided prices are not trusted.
+
+### GET `/api/cart`
+
+- Missing, malformed, unknown or expired token → `200` with an empty cart.
+- Does not create a cart or renew expiration.
+- Existing items remain visible and indicate availability even when a product becomes inactive or stock is insufficient.
+- Unexpected failures → `500 INTERNAL_SERVER_ERROR`.
+
+### POST `/api/cart/items`
+
+Requires `Content-Type: application/json` and a trusted `Origin`.
 
 ```json
-{
-  "items": [],
-  "total_pawstars": 0
-}
+{ "product_id": "1", "quantity": 2 }
 ```
 
-Unexpected database errors return `500 INTERNAL_SERVER_ERROR`.
+- Request body must have **exactly** those two fields: valid positive BIGINT ID string and integer quantity 1–20.
+- A missing/expired cart is created only after a valid addition. An existing item's quantity is **increased**, not replaced.
+- Product must exist, be active, and have enough stock for the new total quantity, which must remain ≤20.
+- Success creates/renews the cookie and seven-day cart expiration. Stock is checked but not reserved or reduced.
+- Responses: `201` new cart, `200` existing cart; `400 VALIDATION_ERROR`, `403 FORBIDDEN_ORIGIN`, `404 PRODUCT_NOT_FOUND`, `409 QUANTITY_LIMIT_EXCEEDED` or `INSUFFICIENT_STOCK`, `415 UNSUPPORTED_MEDIA_TYPE`, `500 INTERNAL_SERVER_ERROR`.
 
-### POST /api/cart/items
+### PATCH `/api/cart/items/:productId`
 
-Adds a product to a guest cart or increases its existing quantity.
-
-Request headers:
-
-- `Content-Type: application/json`
-- `Origin`: must match the configured trusted frontend origin.
-- `Cookie: cart_token=...` is optional for an existing cart.
-
-Example request body:
+Requires a valid existing cart cookie, trusted `Origin`, and JSON body:
 
 ```json
-{
-  "product_id": "1",
-  "quantity": 2
-}
+{ "quantity": 2 }
 ```
 
-Validation:
+- `productId` must be a valid positive BIGINT path ID. Body must contain **only** integer `quantity` from 1 to 20.
+- **Replaces** the quantity; it does not add to it or create a new item.
+- Increasing an item's quantity requires an active product and sufficient stock. Reducing an existing item is allowed even if the product has become inactive or stock has dropped.
+- Success → `200` updated cart, renewed cookie and seven-day expiration.
+- Errors: `400 VALIDATION_ERROR`, `403 FORBIDDEN_ORIGIN`, `404 CART_NOT_FOUND` or `CART_ITEM_NOT_FOUND`, `409 PRODUCT_UNAVAILABLE` or `INSUFFICIENT_STOCK`, `415 UNSUPPORTED_MEDIA_TYPE`, `500 INTERNAL_SERVER_ERROR`.
+- To remove an item, use DELETE; `quantity: 0` is invalid.
 
-- The JSON body must contain exactly `product_id` and `quantity`.
-- `product_id` must be a string representing a valid positive PostgreSQL BIGINT.
-- `quantity` must be an integer between 1 and 20.
-- Frontend-provided prices or unexpected fields are rejected.
-- The product must exist and be active.
-- The resulting quantity cannot exceed 20 or available stock.
+### DELETE `/api/cart/items/:productId`
 
-Behavior:
+Requires a valid existing cart cookie and trusted `Origin`. No JSON request body is required.
 
-- Without an active cart, creates a cart only after successful validation.
-- With an active cart, adds the product or increases its quantity.
-- Uses a PostgreSQL transaction for atomic modifications.
-- Locks relevant database rows during updates.
-- Successful additions renew the cart expiration to seven days.
-- Successful responses set or renew an HttpOnly, SameSite=Lax cart cookie.
-- Secure cookies are enabled in production.
-- Failed additions do not set a cart cookie.
-- Adding products does not decrease or reserve stock.
-- Response totals always use current database prices.
+- Removes **only** the selected cart item, including when the product is unavailable. No stock check is needed.
+- Deleting the last item leaves a valid **empty cart**, not a deleted cart record.
+- Success → `200` updated cart, renewed cookie and seven-day expiration.
+- Errors: `400 VALIDATION_ERROR` (invalid ID), `403 FORBIDDEN_ORIGIN`, `404 CART_NOT_FOUND` or `CART_ITEM_NOT_FOUND`, `500 INTERNAL_SERVER_ERROR`.
 
-Success responses:
+### Cart lifecycle and safety
 
-- `201 Created`: a new cart was created.
-- `200 OK`: an existing cart was updated.
+- A cart expires after **seven days without a successful modification**. GET does not extend it; successful POST, PATCH and DELETE do.
+- Database modifications use transactions and cart row locks to coordinate concurrent requests. Failed modifications roll back and do not renew the cookie.
+- The API validates data on the backend. SQL is parameterized. CORS allows the configured frontend origin; state-changing requests require its trusted `Origin` as CSRF protection.
+- The cookie belongs to the browser; guest carts are **not automatically shared across devices**.
 
-Both return the updated cart using the same JSON structure as GET.
+For schema, reasoning and lifecycle details, use [Shopping Cart Design](./shopping-cart-design.md), rather than repeating them here.
 
-Error responses:
+## 6. Orders, Checkout and Authentication — Planned
 
-| HTTP | Error code              | Meaning                              |
-| ---- | ----------------------- | ------------------------------------ |
-| 400  | VALIDATION_ERROR        | Invalid body, product ID or quantity |
-| 403  | FORBIDDEN_ORIGIN        | Untrusted or missing Origin          |
-| 404  | PRODUCT_NOT_FOUND       | Missing or inactive product          |
-| 409  | QUANTITY_LIMIT_EXCEEDED | Resulting quantity exceeds 20        |
-| 409  | INSUFFICIENT_STOCK      | Not enough available stock           |
-| 415  | UNSUPPORTED_MEDIA_TYPE  | Request is not JSON                  |
-| 500  | INTERNAL_SERVER_ERROR   | Unexpected server failure            |
+Orders will use backend-calculated totals, re-check stock at checkout, and prevent overselling under concurrency. Customers will review a cart, create an order, complete a **simulated** payment, and view order status. Order transitions, cancellation rules, and payment states still need design.
 
-Example error:
+Authentication endpoints have **not** been defined. Before protected features are built, decide whether accounts are needed, which provider/session model to use, per-user authorization and administrative permissions. Guest cart support already works without accounts.
 
-```json
-{
-  "error": {
-    "code": "INSUFFICIENT_STOCK",
-    "message": "Not enough stock available."
-  }
-}
-```
+## 7. Testing and CI
 
-### Security and Testing
+- **Unit / isolated HTTP tests:** Vitest and Supertest test validation, API status codes, cookie behavior, and repository branches using mocks. Mocked repository tests do **not** prove SQL behavior against PostgreSQL.
+- **Integration tests:** dedicated Neon `testing` database for real SQL and Supertest → Express → PostgreSQL. Cart tests check CRUD behavior, expiration, stock rules, transactions and selected concurrent operations.
+- **Future E2E tests:** complete browser workflows after the relevant frontend screens exist.
 
-- CORS is configured through the `cors` middleware.
-- State-changing cart requests require the trusted Origin.
-- PostgreSQL queries use parameterized SQL.
-- Token and cookie handling have automated unit tests.
-- GET and POST have isolated HTTP tests.
-- GET and POST have integration tests against the Neon testing database.
-- POST integration tests cover transactions, quantity limits, stock,
-  expiration renewal and concurrent additions.
-
-### Planned Operations
-
-PATCH will replace an existing item's quantity.
-
-DELETE will remove an item without deleting the cart itself.
-
-See [Shopping Cart Design](./shopping-cart-design.md) for the full
-business rules and implementation plan.
-
-````
-
-## 7. Orders and Checkout — Planned
-
-Customers will be able to:
-
-- Review their shopping cart
-- Create an order
-- Complete a simulated payment
-- View order details and status
-
-Business rules:
-
-- Prices and totals are calculated by the backend.
-- Client-provided prices are never trusted.
-- Stock availability is checked before confirming purchases.
-- Concurrent purchases must not oversell inventory.
-- Order and payment status transitions must be defined.
-
-Exact contracts will be designed before implementation.
-
-## 8. Authentication — Planned
-
-Authentication decisions will be made before implementing protected customer
-functionality.
-
-Open questions:
-
-- Accounts or guest checkout?
-- Authentication provider?
-- Token or session management?
-- Cart persistence?
-- User-specific authorization?
-- Administrative permissions?
-
-No authentication endpoints are defined yet.
-
-## 9. Testing Strategy
-
-Every implemented feature must include appropriate tests.
-
-### Unit Tests
-
-- Validation logic
-- Pagination calculations
-- Business rules
-
-The current isolated API tests exercise these behaviors through Express with a
-mocked PostgreSQL pool.
-
-### Integration Tests
-
-- HTTP endpoint behavior
-- PostgreSQL queries
-- Filtering and sorting
-- Error handling
-
-The current integration test suite connects to a separate Neon `testing` branch.
-
-Some tests execute SQL directly. Others use Supertest to send HTTP requests
-through Express using real PostgreSQL queries.
-
-Integration tests cover product retrieval and shopping cart database
-constraints. Cart database tests use transactions and ROLLBACK to avoid
-persisting test data.
-
-### End-to-End Tests
-
-Complete user workflows once the frontend is implemented.
-
-### Initial Products API Tests
-
-- Returns active products only.
-- Retrieves products by ID.
-- Returns 404 for missing or inactive products.
-- Rejects invalid IDs.
-- Rejects invalid pagination values.
-- Rejects unknown parameters.
-- Rejects repeated parameters.
-- Supports category filtering.
-- Supports case-insensitive search.
-- Supports price filtering.
-- Supports every allowed sorting method.
-- Uses deterministic ordering.
-- Returns correct pagination metadata.
-- Returns empty results correctly.
-
-The isolated tests use a mocked database. The real-database integration suite
-covers a representative subset of these behaviors.
-
-### Running Tests
-
-From the `backend` directory:
-
-Build TypeScript:
+From `backend` on Windows PowerShell:
 
 ```powershell
-npm run build
-````
-
-Run ordinary tests with coverage:
-
-```powershell
-npx vitest run --coverage
-```
-
-Run PostgreSQL integration tests:
-
-```powershell
+npm.cmd run build
+npx.cmd vitest run --coverage
 node --env-file=.env node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts
 ```
 
-Integration tests require `TEST_DATABASE_URL` to point to the Neon testing
-branch, not production.
+`TEST_DATABASE_URL` must point to the **Neon testing branch**, never the application/production database. GitHub Actions uses a dedicated `TEST_DATABASE_URL` secret to run the build, isolated tests and integration tests. Coverage measures executed paths, not proof that all behaviors are correct.
 
-GitHub Actions runs the TypeScript build, isolated tests with coverage,
-and PostgreSQL integration tests.
+## 8. Roadmap and Open Decisions
 
-Integration tests use the TEST_DATABASE_URL GitHub Actions secret,
-which points to the dedicated Neon testing database.
+| Area                                                         | Status / next work                |
+| ------------------------------------------------------------ | --------------------------------- |
+| Product catalog API, listing, details and frontend           | Implemented                       |
+| Guest cart GET, POST, PATCH, DELETE backend                  | Implemented and tested            |
+| Cart frontend and complete cart user flow                    | Planned                           |
+| Additional cart integration edge cases and end-to-end checks | Review before merging             |
+| Authentication                                               | Decide if required                |
+| Orders, stock management and simulated checkout              | Planned                           |
+| Full e-commerce E2E coverage                                 | Planned                           |
+| Hotels and Experiences                                       | Deferred, separate future modules |
 
-### Future Tests
+Open decisions: whether to require customer accounts; authentication and authorization approach; inventory reservation during checkout; order cancellation and status transitions; simulated payment states; administrative API; product image storage. Product categories are already defined; the `image_url` field exists but an image-storage solution is not implemented.
 
-- Cart operations
-- Stock conflicts
-- Concurrent purchases
-- Order transitions
-- Simulated payments
-- Authorization
+## 9. Decision Summary
 
-## 10. Build Order
-
-Each feature will be developed through the relevant database, backend, testing
-and frontend layers.
-
-1. [x] Product catalog API
-2. [x] Product catalog frontend
-3. [x] Product details frontend
-4. [ ] Shopping cart
-5. [ ] Authentication, if required
-6. [ ] Orders and inventory management
-7. [ ] Simulated checkout and payments
-8. [ ] Complete e-commerce testing
-9. [ ] Review future expansion
-
-## 11. Open Decisions
-
-| Decision                              | Decide By                     |
-| ------------------------------------- | ----------------------------- |
-| Product categories                    | Before catalog implementation |
-| Product image storage                 | Before catalog frontend       |
-| Show exact stock or availability only | Before catalog frontend       |
-| Guest checkout vs accounts            | Before cart and orders        |
-| Authentication provider               | Before protected endpoints    |
-| Cart persistence                      | Before cart implementation    |
-| Stock reservation strategy            | Before checkout               |
-| Order cancellation rules              | Before orders                 |
-| Payment simulation and statuses       | Before checkout               |
-| Administrative operations             | After core e-commerce         |
-
-Product categories have been defined for the initial sample dataset.
-The database contains an optional `image_url` field, but image storage is
-not yet implemented.
-
-## 12. Future Expansion
-
-### Hotels
-
-- Hotel catalog
-- Room types or individual rooms
-- Availability by date range
-- Reservations
-- Separate checkout
-
-### Experiences
-
-- Experience catalog
-- Scheduled sessions
-- Participant capacity
-- Availability management
-- Bookings
-
-These modules will be designed separately later.
-
-A unified cart may be evaluated after the independent purchasing and booking
-flows exist.
-
-## 13. Decision Log
-
-| Date       | Decision                           | Reason                                       |
-| ---------- | ---------------------------------- | -------------------------------------------- |
-| 2026-10-12 | Start with product e-commerce      | Focus on API fundamentals                    |
-| 2026-10-12 | Defer Hotels and Experiences       | Booking requires additional domain modeling  |
-| 2026-10-12 | Separate Express backend           | Practice API contracts                       |
-| 2026-10-12 | PostgreSQL without ORM initially   | Learn SQL                                    |
-| 2026-10-12 | Pawstars as whole integers         | Fictional currency without fractional units  |
-| 2026-10-12 | Server-side pagination             | Efficient retrieval and API practice         |
-| 2026-10-12 | Return 200 for valid empty results | No results is not an error                   |
-| 2026-10-12 | Reject invalid query parameters    | Predictable API behavior                     |
-| 2026-10-12 | Deterministic sorting              | Stable ordering for unchanged datasets       |
-| 2026-10-12 | Separate database documentation    | Avoid duplicated database schema definitions |
-| 2026-10-12 | Simulated payments only            | No real financial transactions               |
-| 2026-10-15 | Product catalog API implemented    | Backend endpoints and database are working   |
-| 2026-10-15 | Separate PostgreSQL testing branch | Test real queries without using production   |
-| 2026-10-15 | Separate Vitest configurations     | Keep ordinary CI tests independent of Neon   |
+- **2026-10-12:** Start with product e-commerce; defer Hotels/Experiences. Use a separate Express backend, PostgreSQL without an ORM, integer Pawstars, server-side pagination, predictable validation and deterministic sorting. Return `200` for valid empty result sets and simulate payments only.
+- **2026-10-12:** Keep database schema documentation in a separate file to avoid duplication.
+- **2026-10-15:** Product catalog API implemented; separate Neon testing branch and Vitest configurations added.
+- **2026-10-25:** Guest shopping cart backend endpoints GET/POST/PATCH/DELETE implemented and exercised by isolated and PostgreSQL integration tests. Cart frontend and checkout remain future work.
 
 ---
 
-**Document status:** Product catalog backend implemented and tested.
-
-Other features will be specified incrementally.
+**Document status:** Current API contracts for products and the guest cart; planned features are intentionally high-level.

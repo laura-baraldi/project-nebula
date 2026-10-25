@@ -104,7 +104,8 @@ This branch covers the backend API only. The frontend will be developed separate
 
 ## 6. Database Design
 
-Two new tables will be introduced.
+Two cart tables have been implemented in PostgreSQL:
+`carts` and `cart_items`.
 
 ### carts
 
@@ -126,37 +127,42 @@ Stores:
 - Quantity
 - Creation and update timestamps
 
-Database constraints will:
+Database constraints:
 
 - Prevent duplicate products in the same cart.
 - Enforce valid quantities.
 - Maintain relationships between carts, items and products.
 
-Schema changes will use SQL migrations.
+The schema was created using SQL migration
+`004_create_carts.sql`.
 
 ## 7. REST API
 
-The following endpoints are planned:
+All four shopping cart endpoints are implemented.
 
-| Method | Endpoint                   | Purpose                   |
-| ------ | -------------------------- | ------------------------- |
-| GET    | /api/cart                  | Retrieve the current cart |
-| POST   | /api/cart/items            | Add a product             |
-| PATCH  | /api/cart/items/:productId | Update a quantity         |
-| DELETE | /api/cart/items/:productId | Remove a product          |
+| Method | Endpoint                     | Purpose                                |
+| ------ | ---------------------------- | -------------------------------------- |
+| GET    | `/api/cart`                  | Retrieve the current cart              |
+| POST   | `/api/cart/items`            | Add a product or increase its quantity |
+| PATCH  | `/api/cart/items/:productId` | Replace an item's quantity             |
+| DELETE | `/api/cart/items/:productId` | Remove a product                       |
 
 ### API Rules
 
-- Cart identification uses the cookie, not a cart ID in the URL.
-- POST adds a product or increases its existing quantity.
-- PATCH replaces the quantity of an existing item.
-- DELETE removes only the specified product.
-- GET without a valid cart returns an empty cart.
-- The backend calculates all totals.
-- API responses include product availability information.
-- Errors follow the existing project's JSON error format.
+- The cart is identified through the guest cookie, not a cart ID.
+- GET returns an empty cart when no valid cart exists.
+- POST creates a cart if necessary and adds to existing quantities.
+- PATCH updates an existing item's quantity without adding to it.
+- DELETE removes one item, even if the product is unavailable.
+- Removing the last item leaves an empty, valid cart.
+- POST and PATCH enforce the maximum quantity of 20.
+- The backend calculates prices, subtotals and totals.
+- Responses include product availability information.
+- Successful modifications renew the seven-day expiration.
+- Errors use the project's standard JSON error format.
 
-Detailed request and response schemas will be defined during implementation.
+For request bodies, response examples and HTTP error codes,
+see [API Design](./api-design.md).
 
 ## 8. Security
 
@@ -185,7 +191,8 @@ Security measures must be tested before the API is considered complete.
 
 ## 10. Testing Strategy
 
-Automated tests will cover:
+Automated tests cover the following behaviors, with some
+additional PATCH edge cases still pending:
 
 - Empty and existing carts
 - Cart creation and persistence
