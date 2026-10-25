@@ -9,6 +9,7 @@ import {
   emptyCart,
   getCartByTokenHash,
   updateCartItemQuantity,
+  removeCartItem,
 } from "../db/cart.repository.js";
 
 export const cartRouter = Router();
@@ -239,6 +240,70 @@ cartRouter.patch("/items/:productId", async (req, res) => {
       error: {
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to update cart item.",
+      },
+    });
+  }
+});
+
+// DELETE /api/cart/items/:productId
+cartRouter.delete("/items/:productId", async (req, res) => {
+  try {
+    // Validate the product ID from the URL.
+    const productId = req.params.productId;
+
+    if (!isValidProductId(productId)) {
+      res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid product ID.",
+        },
+      });
+      return;
+    }
+
+    // DELETE can only modify an existing guest cart.
+    const token = readCartToken(req);
+
+    if (token === null) {
+      res.status(404).json({
+        error: {
+          code: "CART_NOT_FOUND",
+          message: "Cart not found.",
+        },
+      });
+      return;
+    }
+
+    const tokenHash = hashCartToken(token);
+
+    // Remove the item within a PostgreSQL transaction.
+    await removeCartItem(tokenHash, productId);
+
+    // Return the updated cart, including current prices.
+    // If this was the last item, the response is an empty cart.
+    const cart = await getCartByTokenHash(tokenHash);
+
+    // Successful deletion renews the seven-day cookie.
+    setCartCookie(res, token);
+
+    res.status(200).json(cart);
+  } catch (error) {
+    if (error instanceof CartBusinessError) {
+      res.status(error.status).json({
+        error: {
+          code: error.code,
+          message: error.message,
+        },
+      });
+      return;
+    }
+
+    console.error("Failed to remove cart item:", error);
+
+    res.status(500).json({
+      error: {
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to remove cart item.",
       },
     });
   }
