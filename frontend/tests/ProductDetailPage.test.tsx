@@ -147,7 +147,9 @@ describe("ProductDetailPage", () => {
 
     render(await ProductDetailPage(pageProps("12")));
 
-    expect(screen.getByText("Out of stock")).toBeInTheDocument();
+    expect(screen.getAllByText("Out of stock")).toHaveLength(2);
+
+    expect(screen.getByRole("button", { name: "Out of stock" })).toBeDisabled();
   });
 
   it("provides a link back to the product catalog", async () => {
