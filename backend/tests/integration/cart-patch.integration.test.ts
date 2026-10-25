@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import request from "supertest";
 
@@ -24,6 +25,36 @@ const ORIGIN = process.env.FRONTEND_ORIGIN ?? "http://localhost:3000";
 
 // Only our test carts will be deleted.
 const createdCartIds: string[] = [];
+
+// Products created exclusively for integration tests.
+const createdProductIds: string[] = [];
+
+async function createTestProduct(
+  stock: number,
+  active = true,
+): Promise<string> {
+  const result = await pool.query(
+    `INSERT INTO products
+       (name, description, price_pawstars, category,
+        stock_quantity, is_active, slug)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id`,
+    [
+      "Integration Test Product",
+      "Temporary product for PATCH tests",
+      100,
+      "test",
+      stock,
+      active,
+      `patch-test-${randomUUID()}`,
+    ],
+  );
+
+  const id: string = result.rows[0].id;
+  createdProductIds.push(id);
+
+  return id;
+}
 
 async function createTestCart(token: string, expired = false): Promise<string> {
   const result = await pool.query(
@@ -105,12 +136,18 @@ function patchItem(productId: string, quantity: number, token?: string) {
 
 afterEach(async () => {
   try {
+    // First remove test carts and their cart items.
     for (const cartId of createdCartIds) {
-      // Foreign-key cascade also deletes cart_items.
       await pool.query("DELETE FROM carts WHERE id = $1", [cartId]);
+    }
+
+    // Then remove only products created by these tests.
+    for (const productId of createdProductIds) {
+      await pool.query("DELETE FROM products WHERE id = $1", [productId]);
     }
   } finally {
     createdCartIds.length = 0;
+    createdProductIds.length = 0;
   }
 });
 
@@ -251,5 +288,79 @@ describe("PATCH /api/cart/items/:productId - PostgreSQL integration", () => {
     expect(response.body.error.code).toBe("VALIDATION_ERROR");
 
     expect(await readQuantity(cartId, product.id)).toBe(3);
+  });
+
+  it("rejects an increase beyond available stock", async () => {
+    // This product has only 2 units available.
+    const productId = await createTestProduct(2);
+    const token = generateCartToken();
+    const cartId = await createTestCart(token);
+
+    await insertCartItem(cartId, productId, 1);
+
+    const response = await patchItem(productId, 3, token);
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("INSUFFICIENT_STOCK");
+
+    // Failed updates must not change PostgreSQL data.
+    expect(await readQuantity(cartId, productId)).toBe(1);
+
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it("allows reducing inactive items but rejects increases", async () => {
+    const productId = await createTestProduct(10, false);
+    const token = generateCartToken();
+    const cartId = await createTestCart(token);
+
+    await insertCartItem(cartId, productId, 5);
+
+    // Increasing an inactive item is forbidden.
+    const increase = await patchItem(productId, 6, token);
+
+    expect(increase.status).toBe(409);
+    expect(increase.body.error.code).toBe("PRODUCT_UNAVAILABLE");
+    expect(await readQuantity(cartId, productId)).toBe(5);
+
+    // Reducing an inactive item must still be allowed.
+    const decrease = await patchItem(productId, 2, token);
+
+    expect(decrease.status).toBe(200);
+    expect(await readQuantity(cartId, productId)).toBe(2);
+
+    expect(decrease.body.items[0]).toMatchObject({
+      product_id: productId,
+      quantity: 2,
+      is_available: false,
+    });
+  });
+
+  it("serializes concurrent PATCH requests to the same cart", async () => {
+    const productId = await createTestProduct(10);
+    const token = generateCartToken();
+    const cartId = await createTestCart(token);
+
+    await insertCartItem(cartId, productId, 1);
+
+    // Two requests replace the quantity concurrently.
+    const [first, second] = await Promise.all([
+      patchItem(productId, 2, token),
+      patchItem(productId, 4, token),
+    ]);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+
+    const finalQuantity = await readQuantity(cartId, productId);
+
+    // PATCH replaces rather than adds.
+    // Whichever transaction commits last determines the final value.
+    expect([2, 4]).toContain(finalQuantity);
+
+    // Both changes must have been processed successfully.
+    // The result must not be 6 or 7.
+    expect(finalQuantity).not.toBe(6);
+    expect(finalQuantity).not.toBe(7);
   });
 });
