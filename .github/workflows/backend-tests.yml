@@ -35,5 +35,10 @@ jobs:
       - name: Build TypeScript
         run: npm run build
 
-      - name: Run tests with coverage
+      - name: Run unit and API tests with coverage
         run: npx vitest run --coverage
+
+      - name: Run PostgreSQL integration tests
+        env:
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+        run: npx vitest run --config vitest.integration.config.ts

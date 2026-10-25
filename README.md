@@ -1,93 +1,95 @@
 # Project Nebula
 
-A fictional full-stack booking and e-commerce platform set on a planet inhabited by hairless cats.
+Project Nebula is a fictional full-stack e-commerce platform set on a planet inhabited by hairless cats.
 
-The project is being developed to practice full-stack software development, API design, SQL, testing and frontend-backend communication.
+The project is built to practice REST API design, TypeScript, React, PostgreSQL, security, automated testing and frontend-backend communication.
 
-All purchases and payments are simulated.
+All purchases and payments are simulated. The fictional currency is the Pawstar (PWS).
+
+## Tech Stack
+
+| Layer    | Technologies                             |
+| -------- | ---------------------------------------- |
+| Frontend | Next.js, React, TypeScript, Tailwind CSS |
+| Backend  | Node.js, Express, TypeScript             |
+| Database | PostgreSQL (Neon), plain SQL             |
+| Testing  | Vitest, Supertest, React Testing Library |
+| CI       | GitHub Actions                           |
+
+The frontend communicates with the Express API through HTTP. Database access and business logic remain in the backend.
 
 ## Features
 
 ### Implemented
 
-**Backend**
+**Product Catalog**
 
-- Product catalog REST API
-- Product details API
-- Category and price filtering
-- Case-insensitive product search
-- Sorting and server-side pagination
-- PostgreSQL database with 30 sample products
-- Database migrations and product seed
-- Individual product detail pages with responsive minimal editorial layout
-- Product information, Pawstars pricing and stock availability
-- Product detail loading skeleton and custom not-found page
-- Shared error boundary with retry functionality
+- Product listing and individual product pages.
+- Category and price filtering.
+- Case-insensitive product search.
+- Sorting and server-side pagination.
+- Responsive product cards and product images.
+- URL-based filters and pagination.
+- Loading states, empty states and error handling.
 
-**Frontend**
+**Shopping Cart Backend**
 
-- Next.js product catalog connected to the Express API
-- Responsive product cards with 30 product images
-- Category filtering with a desktop sidebar and collapsible mobile menu
-- Product search with URL normalization
-- Sorting by price, name and creation date
-- Pagination with Previous and Next navigation
-- Shareable URL-based filter state
-- Empty results and out-of-range page handling
-- Loading skeleton and error recovery
+- Guest shopping carts without user accounts.
+- Persistent cart data stored in PostgreSQL.
+- Secure cart identification using HttpOnly cookies and hashed tokens.
+- GET, POST, PATCH and DELETE cart endpoints.
+- Quantity limits and stock availability validation.
+- Current prices, subtotals and cart totals calculated by the backend.
+- Support for removing or reducing unavailable items.
+- Seven-day cart expiration, renewed after successful modifications.
+- Origin validation, CORS protection and database transactions.
+- Automated unit, HTTP and PostgreSQL integration tests.
 
 **Testing and CI**
 
-- Automated frontend and backend tests
-- PostgreSQL integration tests
-- GitHub Actions for frontend and backend checks
+- Automated frontend and backend tests.
+- PostgreSQL integration tests using a separate Neon testing branch.
+- GitHub Actions checks for build, tests and coverage.
 
 ### Planned
 
-- Shopping cart
-- Stock availability and inventory management
-- Orders
-- Simulated checkout and payments
+- Shopping cart frontend interface.
+- Orders and inventory management during checkout.
+- Simulated checkout and payments.
+- Authentication, if required for future features.
+- Complete end-to-end shopping workflows.
 
 ### Future Expansion
 
-- Hotel and room reservations
-- Experience booking
-- Availability management
-
-## Tech Stack
-
-**Frontend:** Next.js, React, TypeScript, Tailwind CSS
-
-**Backend:** Node.js, Express, TypeScript
-
-**Database:** PostgreSQL on Neon
-
-**Testing:** Vitest, React Testing Library, Supertest
-
-**CI:** GitHub Actions
+Hotel reservations and experience booking are outside the current scope and may be implemented as separate modules later.
 
 ## Project Structure
 
-- `frontend/` - Next.js application, product catalog, images and frontend tests
-- `backend/` - REST API, database migrations, seeds and backend tests
-- `docs/` - API, database, architecture and frontend design documentation
+```text
+project-nebula/
+├── frontend/       Next.js frontend and tests
+├── backend/        Express API, SQL migrations and tests
+├── docs/           API, database and architecture documentation
+└── .github/        GitHub Actions workflows
+```
+
+The shopping cart backend separates HTTP routes from database operations. Repository modules handle reading cart data and modifying it through PostgreSQL transactions.
 
 ## Running the Backend
 
-From the `backend` directory:
+From the `backend` directory, install dependencies:
 
 ```powershell
 npm.cmd install
 ```
 
-Create a `.env` file inside `backend/` containing the PostgreSQL connection string:
+Create `backend/.env` and provide your PostgreSQL connection string:
 
 ```dotenv
 DATABASE_URL=your_postgresql_connection_string
 ```
 
-Start the development server:
+Start the backend:
 
 ```powershell
 npm.cmd run dev
@@ -95,17 +97,42 @@ npm.cmd run dev
 
 The API runs at `http://localhost:4000` by default.
 
-### Available Endpoints
+### Available API Endpoints
 
-- `GET /api/health`
-- `GET /api/products`
-- `GET /api/products/:id`
+| Method | Endpoint                     | Purpose                                  |
+| ------ | ---------------------------- | ---------------------------------------- |
+| GET    | `/api/health`                | Health check                             |
+| GET    | `/api/products`              | List, filter, sort and paginate products |
+| GET    | `/api/products/:id`          | Retrieve product details                 |
+| GET    | `/api/cart`                  | Retrieve the guest cart                  |
+| POST   | `/api/cart/items`            | Add a product to the cart                |
+| PATCH  | `/api/cart/items/:productId` | Replace an item's quantity               |
+| DELETE | `/api/cart/items/:productId` | Remove an item                           |
 
-Example:
+Example product request:
 
 ```text
-GET /api/products?category=clothing&sort=price_asc&page=1&limit=5
+GET /api/products?category=clothing&sort=price_asc&page=1&limit=20
 ```
+
+Example cart addition:
+
+```http
+POST /api/cart/items
+Content-Type: application/json
+Origin: http://localhost:3000
+```
+
+```json
+{
+  "product_id": "1",
+  "quantity": 2
+}
+```
+
+The cart uses a browser cookie to identify the guest. POST, PATCH and DELETE require requests from the trusted frontend origin.
+
+For complete request formats, responses, validation rules and errors, see [API Design](docs/api-design.md).
 
 ## Running the Frontend
 
@@ -118,31 +145,19 @@ npm.cmd run dev
 
 The frontend runs at `http://localhost:3000`.
 
-The product catalog is available at `http://localhost:3000/products`.
-
-The Express backend must be running to retrieve product data.
-
-### Product Catalog
-
-The catalog supports category filtering, product search, sorting and pagination.
-
-Filters are stored in URL query parameters, allowing users to share or bookmark catalog views.
-
-Example:
+The product catalog is available at:
 
 ```text
-/products?category=toys&q=moon&sort=price_asc&page=2
+http://localhost:3000/products
 ```
 
-Search queries are normalized by Next.js, which redirects URLs containing unnecessary surrounding whitespace to their clean equivalents.
+The Express backend must be running for the frontend to retrieve product data.
 
-The catalog includes responsive category navigation, loading skeletons, empty states and error handling.
-
-Filtering, searching, sorting and pagination are performed by the Express backend.
+The frontend currently includes the product catalog and product details. The shopping cart interface will be developed separately.
 
 ## Testing
 
-### Backend Tests
+### Backend Unit and HTTP Tests
 
 From the `backend` directory:
 
@@ -151,23 +166,27 @@ npm.cmd run build
 npx.cmd vitest run --coverage
 ```
 
-The ordinary tests use a mocked database connection.
+These tests use mocked database operations to verify repository logic, HTTP responses, validation, cookies and error handling.
 
 ### PostgreSQL Integration Tests
 
-Integration tests use a separate Neon testing branch. Add its connection string to `backend/.env`:
+Integration tests use a dedicated Neon testing database.
+
+Add its connection string to `backend/.env`:
 
 ```dotenv
-TEST_DATABASE_URL=your_testing_postgresql_connection_string
+TEST_DATABASE_URL=your_neon_testing_connection_string
 ```
 
-Then run:
+Run:
 
 ```powershell
 node --env-file=.env node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts
 ```
 
-The testing database must be separate from production.
+These tests exercise real PostgreSQL queries and API behavior, including cart creation, quantity updates, deletion, expiration and selected concurrent operations.
+
+`TEST_DATABASE_URL` must point to the separate testing database, never the main application database.
 
 ### Frontend Tests
 
@@ -180,26 +199,23 @@ npx.cmd tsc --noEmit
 npm.cmd run build
 ```
 
-The frontend test suite uses mocked API responses and verifies catalog components and product image paths.
+GitHub Actions runs automated frontend and backend checks.
 
-GitHub Actions runs frontend and backend checks automatically.
-
-Environment files and credentials must never be committed to Git.
+Never commit `.env` files, database passwords or other credentials.
 
 ## Documentation
 
-- [API Design](docs/api-design.md)
-- [Backend Architecture](docs/backend-architecture.md)
-- [Database Design](docs/database-design.md)
-- [Frontend Catalog Design](docs/frontend-catalog-design.md)
-- [Product Detail Design](docs/product-detail-design.md)
+- [API Design](docs/api-design.md) — Endpoints, validation and responses.
+- [Shopping Cart Design](docs/shopping-cart-design.md) — Cart rules, security and lifecycle.
+- [Database Design](docs/database-design.md) — Tables, constraints and SQL design.
+- [Backend Architecture](docs/backend-architecture.md) — Backend structure and responsibilities.
+- [Frontend Catalog Design](docs/frontend-catalog-design.md) — Catalog UI and filtering.
+- [Product Detail Design](docs/product-detail-design.md) — Individual product pages.
 
-## Status
+## Project Status
 
-The product catalog and individual product detail pages are implemented and tested.
+The product catalog frontend and backend are implemented and tested.
 
-The catalog supports category filtering, search, sorting, pagination, URL-based state management, loading states and error handling.
+The guest shopping cart backend is also implemented, including all four REST operations: GET, POST, PATCH and DELETE.
 
-Product detail pages provide responsive product information, stock availability, loading skeletons, custom not-found handling and shared error recovery.
-
-Future development will focus on additional e-commerce features, including shopping cart, orders and simulated checkout.
+The next development phase will focus on the shopping cart frontend, followed by orders and simulated checkout.
