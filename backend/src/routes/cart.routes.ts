@@ -8,6 +8,7 @@ import {
   addCartItem,
   emptyCart,
   getCartByTokenHash,
+  updateCartItemQuantity,
 } from "../db/cart.repository.js";
 
 export const cartRouter = Router();
@@ -141,6 +142,103 @@ cartRouter.post("/items", async (req, res) => {
       error: {
         code: "INTERNAL_SERVER_ERROR",
         message: "Failed to add cart item.",
+      },
+    });
+  }
+});
+
+// PATCH /api/cart/items/:productId
+cartRouter.patch("/items/:productId", async (req, res) => {
+  try {
+    // PATCH only accepts JSON.
+    if (!req.is("application/json")) {
+      res.status(415).json({
+        error: {
+          code: "UNSUPPORTED_MEDIA_TYPE",
+          message: "Content-Type must be application/json.",
+        },
+      });
+      return;
+    }
+
+    // Validate the product ID from the URL.
+    const productId = req.params.productId;
+
+    if (!isValidProductId(productId)) {
+      res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid product ID.",
+        },
+      });
+      return;
+    }
+
+    // The body must contain only the new quantity.
+    const body = req.body;
+
+    if (
+      body === null ||
+      typeof body !== "object" ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 1 ||
+      !Object.hasOwn(body, "quantity") ||
+      !Number.isInteger(body.quantity) ||
+      body.quantity < 1 ||
+      body.quantity > 20
+    ) {
+      res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Provide a valid quantity (1-20).",
+        },
+      });
+      return;
+    }
+
+    // PATCH cannot create a cart.
+    // An existing valid cookie is required.
+    const token = readCartToken(req);
+
+    if (token === null) {
+      res.status(404).json({
+        error: {
+          code: "CART_NOT_FOUND",
+          message: "Cart not found.",
+        },
+      });
+      return;
+    }
+
+    const tokenHash = hashCartToken(token);
+
+    // Update the existing item using a database transaction.
+    await updateCartItemQuantity(tokenHash, productId, body.quantity);
+
+    // Fetch the updated cart using current database prices.
+    const cart = await getCartByTokenHash(tokenHash);
+
+    // A successful PATCH renews the seven-day cookie.
+    setCartCookie(res, token);
+
+    res.status(200).json(cart);
+  } catch (error) {
+    if (error instanceof CartBusinessError) {
+      res.status(error.status).json({
+        error: {
+          code: error.code,
+          message: error.message,
+        },
+      });
+      return;
+    }
+
+    console.error("Failed to update cart item:", error);
+
+    res.status(500).json({
+      error: {
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to update cart item.",
       },
     });
   }
