@@ -10,3 +10,5 @@ export {
   addCartItem,
   updateCartItemQuantity,
 } from "./cart/cart.write.repository.js";
+
+export { removeCartItem } from "./cart/cart.delete.repository.js";
