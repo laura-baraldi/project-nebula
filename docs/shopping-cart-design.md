@@ -191,8 +191,8 @@ Security measures must be tested before the API is considered complete.
 
 ## 10. Testing Strategy
 
-Automated tests cover the following behaviors, with some
-additional PATCH edge cases still pending:
+Automated unit, HTTP and PostgreSQL integration tests cover
+the main cart operations, validation rules and error scenarios.
 
 - Empty and existing carts
 - Cart creation and persistence
@@ -228,22 +228,41 @@ PostgreSQL integration tests will use the separate testing database.
 
 ## 12. Implementation Status
 
-- [x] Create PostgreSQL migrations.
-- [x] Implement cart token generation and hashing.
-- [x] Implement cookie handling helpers.
-- [x] Add database constraint integration tests.
-- [x] Add token and cookie unit tests.
-- [x] Configure GitHub Actions integration tests.
-- [x] Implement CSRF origin protection and CORS.
+### Database and Security
+
+- [x] Create PostgreSQL cart tables, constraints and migrations.
+- [x] Implement secure cart tokens and SHA-256 hashing.
+- [x] Implement HttpOnly cookie handling.
+- [x] Configure CORS and trusted-Origin protection.
+- [x] Implement seven-day cart expiration and renewal.
+- [x] Use parameterized SQL and PostgreSQL transactions.
+- [x] Protect concurrent cart modifications using row locks.
+
+### API Endpoints
+
 - [x] Implement GET /api/cart.
 - [x] Implement POST /api/cart/items.
-- [x] Implement POST quantity and stock validation.
-- [x] Implement cart price and total calculations.
-- [x] Implement seven-day cart expiration checks and POST renewal.
-- [x] Implement POST database transactions.
-- [x] Add GET and POST API unit and integration tests.
-- [x] Document GET and POST API contracts.
-- [ ] Implement PATCH /api/cart/items/:productId.
-- [ ] Implement DELETE /api/cart/items/:productId.
-- [ ] Complete remaining cart API tests and documentation.
-- [ ] Open and merge the pull request.
+- [x] Implement PATCH /api/cart/items/:productId.
+- [x] Implement DELETE /api/cart/items/:productId.
+- [x] Implement quantity and stock validation.
+- [x] Calculate prices, subtotals and totals.
+- [x] Preserve unavailable items in existing carts.
+
+### Testing
+
+- [x] Add token and cookie unit tests.
+- [x] Add repository unit tests for all cart operations.
+- [x] Add HTTP tests for all four endpoints.
+- [x] Add PostgreSQL integration tests for GET, POST, PATCH and DELETE.
+- [x] Test expiration, validation errors and rollback behavior.
+- [x] Test stock conflicts and inactive products.
+- [x] Test selected concurrent cart operations.
+- [x] Configure GitHub Actions for backend build and tests.
+
+### Documentation and Completion
+
+- [x] Document API contracts and business rules.
+- [x] Update the project README.
+- [ ] Complete final test and CI verification.
+- [ ] Open and review the pull request.
+- [ ] Merge the completed branch into main.
