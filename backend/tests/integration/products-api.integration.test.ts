@@ -108,19 +108,28 @@ describe("Products API integration", () => {
   });
 
   it("applies category and price filters together", async () => {
-    // Find an existing product and use its category and price
-    // to construct filters with a guaranteed matching example.
-    const initial = await request(app).get("/api/products?limit=50");
+    // Select a stable product from the actual catalog.
+    // Other integration tests may create and delete temporary
+    // products in the "test" category while this test runs.
+    const reference = await pool.query<Product>(
+      `SELECT id, name, category, price_pawstars, is_active
+     FROM products
+     WHERE is_active = TRUE
+       AND category IN (
+         'accessories', 'clothing', 'food', 'home',
+         'skincare', 'tech', 'toys', 'travel'
+       )
+     ORDER BY id
+     LIMIT 1`,
+    );
 
-    expect(initial.status).toBe(200);
+    expect(reference.rows).toHaveLength(1);
 
-    const products = (initial.body as ProductsResponse).items;
-    expect(products.length).toBeGreaterThan(0);
-
-    const referenceProduct = products[0];
+    const referenceProduct = reference.rows[0];
     const category = referenceProduct.category;
     const price = referenceProduct.price_pawstars;
 
+    // Filter simultaneously by category and exact price.
     const response = await request(app).get("/api/products").query({
       category,
       min_price: price,
@@ -132,9 +141,9 @@ describe("Products API integration", () => {
 
     const body = response.body as ProductsResponse;
 
+    // The selected catalog product must match both filters.
     expect(body.items.length).toBeGreaterThan(0);
 
-    // All returned products must match every filter.
     for (const product of body.items) {
       expect(product.category).toBe(category);
       expect(product.price_pawstars).toBe(price);
