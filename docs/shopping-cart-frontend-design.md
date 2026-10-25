@@ -1,0 +1,136 @@
+# Shopping Cart — Frontend Design
+
+## 1. Overview
+
+The shopping cart frontend uses Next.js, React, TypeScript and Tailwind CSS.
+
+It communicates with the existing Express Shopping Cart API.
+
+The frontend does not access PostgreSQL directly or manage secret cart tokens.
+
+## 2. Goals
+
+- Allow visitors to add products to their cart.
+- Display cart contents and current totals.
+- Allow quantity updates and item removal.
+- Preserve cart contents across refreshes.
+- Handle stock changes and unavailable products.
+- Maintain the existing responsive pastel-purple design.
+
+## 3. Pages and Components
+
+### Product Catalog and Details
+
+- Display an Add to Cart button.
+- Disable adding products with no available stock.
+- Show loading, success and error feedback.
+- Prevent repeated submissions while a request is pending.
+
+### Cart Page — `/cart`
+
+Display:
+
+- Product image and name.
+- Unit price in Pawstars.
+- Quantity controls.
+- Item subtotal.
+- Availability status.
+- Remove button.
+- Cart total.
+- Empty cart state.
+- Loading and error states.
+
+Provide links back to the product catalog.
+
+### Cart Navigation
+
+Add a cart link to the site navigation.
+
+A cart item-count badge may be added after the core functionality is working.
+
+## 4. API Integration
+
+| Action          | API                                 |
+| --------------- | ----------------------------------- |
+| Load cart       | GET `/api/cart`                     |
+| Add product     | POST `/api/cart/items`              |
+| Change quantity | PATCH `/api/cart/items/:productId`  |
+| Remove product  | DELETE `/api/cart/items/:productId` |
+
+The `lib/cartApi.ts` module centralizes API calls and error handling.
+
+Browser requests use `credentials: "include"`.
+
+The cart token is stored in an HttpOnly cookie and is never read by frontend JavaScript.
+
+The backend remains responsible for validation, prices, totals and stock rules.
+
+## 5. Quantity and Availability Rules
+
+- Minimum quantity: 1.
+- Maximum quantity: 20 per product.
+- POST increases quantity.
+- PATCH replaces quantity.
+- DELETE removes the item.
+- Unavailable products remain visible in the cart.
+- Visitors may reduce or remove unavailable products.
+- Increasing unavailable products is not allowed.
+- Frontend validation improves usability but does not replace backend validation.
+
+## 6. State and Error Handling
+
+- Display a loading state while retrieving the cart.
+- Update displayed cart data using successful API responses.
+- Do not assume a modification succeeded before confirmation.
+- Keep the previous cart state when a request fails.
+- Show useful feedback for stock conflicts and unavailable products.
+- Allow retrying failed operations.
+- Refreshing the page retrieves the persisted cart from the backend.
+- The first implementation does not use localStorage for cart persistence.
+
+## 7. Security and Deployment
+
+- Use browser-managed cookies.
+- Never expose the cart token in URLs or JavaScript.
+- Keep the API URL configurable for different environments.
+- Verify CORS, trusted Origin and cookie behavior when deploying.
+- Preserve backend validation and authorization boundaries.
+
+## 8. Testing
+
+Automated tests should cover:
+
+- API client requests and errors.
+- Add to Cart loading, success and failure.
+- Quantity updates and item removal.
+- Empty cart rendering.
+- Unavailable items and stock conflicts.
+- Cart loading and retry behavior.
+- Responsive and accessible controls.
+
+Use Vitest, React Testing Library and mocked API responses.
+
+Real browser-to-backend integration will be verified separately.
+
+## 9. Implementation Plan
+
+- [x] Create `lib/cartApi.ts`.
+- [x] Add API client tests with full coverage.
+- [ ] Implement Add to Cart buttons.
+- [ ] Create the `/cart` page.
+- [ ] Implement quantity controls and item removal.
+- [ ] Add cart navigation.
+- [ ] Complete component tests.
+- [ ] Verify backend integration in the browser.
+- [ ] Update README and documentation.
+- [ ] Open and merge the frontend pull request.
+
+## 10. Out of Scope
+
+- Customer accounts.
+- Checkout and payments.
+- Orders.
+- Inventory reservation.
+- Cross-device cart synchronization.
+
+These features will be addressed separately.
