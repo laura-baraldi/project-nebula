@@ -33,8 +33,8 @@ Orders, payments, hotels and experiences remain future features.
 
 ### Purpose
 
-The `products` table stores items available in the fictional Puzzini Shop.
-
+The `products` table stores items available in the fictional Galaxy Shop.
+zzini
 Each row represents one product.
 
 ### SQL Schema
