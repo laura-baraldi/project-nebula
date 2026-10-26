@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AddToCartButton from "@/components/AddToCartButton";
 import { addCartItem, CartApiError } from "@/lib/cartApi";
+import { CART_UPDATED_EVENT } from "@/lib/cartEvents";
 
 vi.mock("@/lib/cartApi", () => ({
   addCartItem: vi.fn(),
@@ -54,22 +55,38 @@ describe("AddToCartButton", () => {
     expect(mockedAddCartItem).not.toHaveBeenCalled();
   });
 
-  it("adds one product and displays a success message", async () => {
+  it("adds one product, notifies the cart update and displays success", async () => {
     const user = userEvent.setup();
-    mockedAddCartItem.mockResolvedValueOnce({
+
+    const updatedCart = {
       items: [],
       total_pawstars: 0,
-    });
+    };
 
-    render(<AddToCartButton {...props} />);
+    mockedAddCartItem.mockResolvedValueOnce(updatedCart);
 
-    await user.click(screen.getByRole("button", { name: "Add to Cart" }));
+    const onCartUpdated = vi.fn();
+    window.addEventListener(CART_UPDATED_EVENT, onCartUpdated);
 
-    expect(mockedAddCartItem).toHaveBeenCalledWith("12", 1);
+    try {
+      render(<AddToCartButton {...props} />);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Moonwarm Bodysuit added to cart!",
-    );
+      await user.click(screen.getByRole("button", { name: "Add to Cart" }));
+
+      expect(mockedAddCartItem).toHaveBeenCalledWith("12", 1);
+
+      expect(await screen.findByRole("status")).toHaveTextContent(
+        "Moonwarm Bodysuit added to cart!",
+      );
+
+      expect(onCartUpdated).toHaveBeenCalledOnce();
+
+      const event = onCartUpdated.mock.calls[0][0] as CustomEvent;
+
+      expect(event.detail).toEqual(updatedCart);
+    } finally {
+      window.removeEventListener(CART_UPDATED_EVENT, onCartUpdated);
+    }
   });
 
   it("disables repeated submissions while loading", async () => {
@@ -180,5 +197,28 @@ describe("AddToCartButton", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Add to Cart" })).toBeEnabled();
     });
+  });
+
+  it("does not notify a cart update when the API request fails", async () => {
+    const user = userEvent.setup();
+
+    mockedAddCartItem.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const onCartUpdated = vi.fn();
+    window.addEventListener(CART_UPDATED_EVENT, onCartUpdated);
+
+    try {
+      render(<AddToCartButton {...props} />);
+
+      await user.click(screen.getByRole("button", { name: "Add to Cart" }));
+
+      expect(await screen.findByRole("status")).toHaveTextContent(
+        "Could not add the product. Please try again.",
+      );
+
+      expect(onCartUpdated).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(CART_UPDATED_EVENT, onCartUpdated);
+    }
   });
 });

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { addCartItem, CartApiError } from "@/lib/cartApi";
+import { notifyCartUpdated } from "@/lib/cartEvents";
 
 type AddToCartButtonProps = {
   productId: string;
@@ -32,7 +33,8 @@ export default function AddToCartButton({
     try {
       // POST increases the cart quantity by one.
       // The backend validates stock and quantity limits.
-      await addCartItem(productId, 1);
+      const updatedCart = await addCartItem(productId, 1);
+      notifyCartUpdated(updatedCart);
 
       setMessage(`${productName} added to cart!`);
     } catch (error) {

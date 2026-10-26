@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { notifyCartUpdated } from "@/lib/cartEvents";
 
 import {
   getCart,
@@ -56,6 +57,7 @@ export default function CartPage() {
     try {
       const updatedCart = await updateCartItem(productId, quantity);
       setCart(updatedCart);
+      notifyCartUpdated(updatedCart);
     } catch (err) {
       setError(
         err instanceof CartApiError
@@ -76,6 +78,7 @@ export default function CartPage() {
     try {
       const updatedCart = await removeCartItem(productId);
       setCart(updatedCart);
+      notifyCartUpdated(updatedCart);
     } catch (err) {
       setError(
         err instanceof CartApiError
