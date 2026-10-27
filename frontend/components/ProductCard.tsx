@@ -8,6 +8,7 @@ type ProductCardProps = {
   category: string;
   price: number;
   imageUrl: string;
+  stockQuantity: number;
 };
 
 export default function ProductCard({
@@ -17,6 +18,7 @@ export default function ProductCard({
   category,
   price,
   imageUrl,
+  stockQuantity,
 }: ProductCardProps) {
   return (
     <article className="h-full overflow-hidden rounded-2xl bg-white shadow-sm">
@@ -33,6 +35,13 @@ export default function ProductCard({
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="object-cover"
           />
+
+          {stockQuantity <= 0 && (
+            <span className="absolute left-3 top-3 z-10 inline-flex items-center gap-2 rounded-full border border-red-300 bg-red-100 px-4 py-2 text-sm font-semibold text-red-800 shadow-md">
+              <span className="h-2 w-2 rounded-full bg-red-600" />
+              Out of stock
+            </span>
+          )}
         </div>
 
         <div className="flex flex-1 flex-col p-6">

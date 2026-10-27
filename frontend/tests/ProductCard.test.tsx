@@ -15,6 +15,7 @@ const product = {
   category: "clothing",
   price: 3900,
   imageUrl: "/products/clothing/moonwarm-bodysuit.webp",
+  stockQuantity: 5,
 };
 
 describe("ProductCard", () => {
@@ -53,6 +54,18 @@ describe("ProductCard", () => {
     );
   });
 
+  it("renders the out-of-stock badge when stock quantity is zero", () => {
+    render(<ProductCard {...product} stockQuantity={0} />);
+
+    expect(screen.getByText("Out of stock")).toBeInTheDocument();
+  });
+
+  it("does not render the out-of-stock badge when the product is in stock", () => {
+    render(<ProductCard {...product} stockQuantity={5} />);
+
+    expect(screen.queryByText("Out of stock")).not.toBeInTheDocument();
+  });
+
   it("renders a different product correctly", () => {
     render(
       <ProductCard
@@ -62,6 +75,7 @@ describe("ProductCard", () => {
         category="travel"
         price={18500}
         imageUrl="/products/travel/purrship-mini.webp"
+        stockQuantity={5}
       />,
     );
 
