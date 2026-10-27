@@ -88,6 +88,38 @@ project-nebula/
 
 The shopping cart backend separates HTTP routes from database operations. Repository modules handle reading cart data and modifying it through PostgreSQL transactions.
 
+## Configuration
+
+### Backend
+
+Create `backend/.env` and configure the PostgreSQL connection:
+
+```dotenv
+DATABASE_URL=your_postgresql_connection_string
+```
+
+The API runs at `http://localhost:4000` by default.
+
+### Frontend
+
+The frontend uses `NEXT_PUBLIC_API_URL` to determine the base URL of the backend API.
+
+If the variable is not set, the frontend defaults to:
+
+```dotenv
+http://localhost:4000
+```
+
+For local development, this fallback can be used without additional configuration. To configure a different backend URL, create `frontend/.env.local` and add:
+
+```dotenv
+NEXT_PUBLIC_API_URL=http://localhost:4000
+```
+
+Replace the URL with the address of the backend environment you want to use. Restart the Next.js development server after changing environment variables.
+
+`NEXT_PUBLIC_API_URL` is exposed to the browser and must contain only a public API base URL, never secrets or credentials.
+
 ## Running the Backend
 
 From the `backend` directory, install dependencies:
@@ -96,19 +128,11 @@ From the `backend` directory, install dependencies:
 npm.cmd install
 ```
 
-Create `backend/.env` and provide your PostgreSQL connection string:
-
-```dotenv
-DATABASE_URL=your_postgresql_connection_string
-```
-
-Start the backend:
+Create `backend/.env` with the required `DATABASE_URL`, then start the backend:
 
 ```powershell
 npm.cmd run dev
 ```
-
-The API runs at `http://localhost:4000` by default.
 
 ### Available API Endpoints
 
@@ -145,99 +169,59 @@ Origin: http://localhost:3000
 
 The cart uses a browser cookie to identify the guest. POST, PATCH and DELETE require requests from the trusted frontend origin.
 
-For complete request formats, responses, validation rules and errors, see [API Design](docs/api-design.md).
-
 ## Running the Frontend
 
-From the `frontend` directory:
+From the `frontend` directory, install dependencies:
 
 ```powershell
 npm.cmd install
+```
+
+Start the Next.js development server:
+
+```powershell
 npm.cmd run dev
 ```
 
 The frontend runs at `http://localhost:3000`.
 
-The product catalog is available at:
+Useful routes:
 
-```text
-http://localhost:3000/products
-```
-
-The shopping cart is available at:
-
-```text
-http://localhost:3000/cart
-```
+- `/products` — product catalog.
+- `/products/:id` — product details.
+- `/cart` — shopping cart.
 
 The Express backend must be running for the frontend to retrieve product data and use the shopping cart API.
 
-The frontend includes the product catalog, product detail pages and shopping cart interface. The cart uses the backend API for persistence, validation, stock availability and price calculations.
-
 ## Testing
 
-### Backend Unit and HTTP Tests
+### Frontend
 
-From the `backend` directory:
+From the `frontend` directory, run the tests:
 
 ```powershell
-npm.cmd run build
+npx.cmd vitest run
+```
+
+Run the tests with coverage:
+
+```powershell
 npx.cmd vitest run --coverage
 ```
 
-These tests use mocked database operations to verify repository logic, HTTP responses, validation, cookies and error handling.
+### Backend
 
-### PostgreSQL Integration Tests
-
-Integration tests use a dedicated Neon testing database.
-
-Add its connection string to `backend/.env`:
-
-```dotenv
-TEST_DATABASE_URL=your_neon_testing_connection_string
-```
-
-Run:
-
-```powershell
-node --env-file=.env node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts
-```
-
-These tests exercise real PostgreSQL queries and API behavior, including cart creation, quantity updates, deletion, expiration and selected concurrent operations.
-
-`TEST_DATABASE_URL` must point to the separate testing database, never the main application database.
-
-### Frontend Tests
-
-From the `frontend` directory:
-
-```powershell
-npm.cmd run test
-npm.cmd run lint
-npx.cmd tsc --noEmit
-npm.cmd run build
-```
+Run the backend test scripts from the `backend` directory using the scripts defined in its `package.json`. PostgreSQL integration tests require the configured test database.
 
 GitHub Actions runs automated frontend and backend checks.
 
-Unit and component tests do not, by themselves, prove that the complete application works through a real browser connected to the backend. Verify the end-to-end shopping workflow separately.
-
-Never commit `.env` files, database passwords or other credentials.
-
 ## Documentation
 
-- [API Design](docs/api-design.md) — Endpoints, validation and responses.
-- [Shopping Cart Design](docs/shopping-cart-design.md) — Cart rules, security and lifecycle.
 - [Shopping Cart Frontend Design](docs/shopping-cart-frontend-design.md) — Cart interface, API usage, state handling and frontend tests.
-- [Database Design](docs/database-design.md) — Tables, constraints and SQL design.
-- [Backend Architecture](docs/backend-architecture.md) — Backend structure and responsibilities.
 - [Frontend Catalog Design](docs/frontend-catalog-design.md) — Catalog UI and filtering.
-- [Product Detail Design](docs/product-detail-design.md) — Individual product pages.
 
 ## Project Status
 
-The product catalog and product detail frontend and backend are implemented.
+The product catalog and product detail frontend and backend are implemented. The shopping cart backend supports all four REST operations: GET, POST, PATCH and DELETE. The frontend includes Add to Cart controls, a dedicated cart page, quantity controls, item removal and cart navigation.
 
-The guest shopping cart backend is implemented, including all four REST operations: GET, POST, PATCH and DELETE. The frontend includes Add to Cart controls, a dedicated cart page, quantity controls, item removal and cart navigation.
-
-The remaining shopping-cart work is to verify real browser-to-backend integration and complete end-to-end shopping workflows. Orders, inventory management during checkout and simulated payments remain future features.
+Checkout, orders and payment processing are not implemented. All purchases and payments remain simulated; no real payment provider is connected.
