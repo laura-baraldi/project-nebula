@@ -128,7 +128,7 @@ export default async function ProductDetailPage({
                 productId={id}
                 productName={product.name}
                 inStock={inStock}
-                compact
+                compact={false}
               />
             </div>
 

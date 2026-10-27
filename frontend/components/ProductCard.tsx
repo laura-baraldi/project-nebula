@@ -55,7 +55,6 @@ export default function ProductCard({
 
         <Link
           href={`/products/${id}`}
-          aria-label={`View ${name} details`}
           className="mt-2 rounded-sm focus-visible:outline-2 focus-visible:outline-violet-700"
         >
           <h2 className="text-lg font-bold text-violet-900 transition-colors group-hover:text-violet-700">
