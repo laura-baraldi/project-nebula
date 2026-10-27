@@ -14,6 +14,7 @@ type Product = {
   price_pawstars: number;
   category: string;
   image_url: string;
+  stock_quantity: number;
 };
 
 type ProductsResponse = {
@@ -122,6 +123,7 @@ export async function ProductsContent({
                     category={product.category}
                     price={product.price_pawstars}
                     imageUrl={product.image_url}
+                    stockQuantity={product.stock_quantity}
                   />
                 ))}
               </div>

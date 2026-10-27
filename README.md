@@ -22,7 +22,7 @@ The frontend communicates with the Express API through HTTP. Database access and
 
 ### Implemented
 
-**Product Catalog**
+**Product Catalog and Product Details**
 
 - Product listing and individual product pages.
 - Category and price filtering.
@@ -31,6 +31,7 @@ The frontend communicates with the Express API through HTTP. Database access and
 - Responsive product cards and product images.
 - URL-based filters and pagination.
 - Loading states, empty states and error handling.
+- Product details, prices and stock availability.
 
 **Shopping Cart Backend**
 
@@ -45,19 +46,31 @@ The frontend communicates with the Express API through HTTP. Database access and
 - Origin validation, CORS protection and database transactions.
 - Automated unit, HTTP and PostgreSQL integration tests.
 
+**Shopping Cart Frontend**
+
+- Add to Cart controls on product interfaces.
+- A dedicated `/cart` page.
+- Quantity controls and item removal.
+- Cart navigation and cart update notifications.
+- Loading, empty and error states.
+- Frontend API calls through a dedicated cart API module.
+- Browser-managed cookies for guest cart identification.
+
 **Testing and CI**
 
 - Automated frontend and backend tests.
 - PostgreSQL integration tests using a separate Neon testing branch.
 - GitHub Actions checks for build, tests and coverage.
 
+Real browser-to-backend integration and complete end-to-end shopping workflows must be verified separately before the complete shopping flow is considered tested.
+
 ### Planned
 
-- Shopping cart frontend interface.
+- Complete browser-to-backend integration verification.
+- End-to-end tests for complete shopping workflows.
 - Orders and inventory management during checkout.
 - Simulated checkout and payments.
 - Authentication, if required for future features.
-- Complete end-to-end shopping workflows.
 
 ### Future Expansion
 
@@ -151,9 +164,15 @@ The product catalog is available at:
 http://localhost:3000/products
 ```
 
-The Express backend must be running for the frontend to retrieve product data.
+The shopping cart is available at:
 
-The frontend currently includes the product catalog and product details. The shopping cart interface will be developed separately.
+```text
+http://localhost:3000/cart
+```
+
+The Express backend must be running for the frontend to retrieve product data and use the shopping cart API.
+
+The frontend includes the product catalog, product detail pages and shopping cart interface. The cart uses the backend API for persistence, validation, stock availability and price calculations.
 
 ## Testing
 
@@ -201,12 +220,15 @@ npm.cmd run build
 
 GitHub Actions runs automated frontend and backend checks.
 
+Unit and component tests do not, by themselves, prove that the complete application works through a real browser connected to the backend. Verify the end-to-end shopping workflow separately.
+
 Never commit `.env` files, database passwords or other credentials.
 
 ## Documentation
 
 - [API Design](docs/api-design.md) — Endpoints, validation and responses.
 - [Shopping Cart Design](docs/shopping-cart-design.md) — Cart rules, security and lifecycle.
+- [Shopping Cart Frontend Design](docs/shopping-cart-frontend-design.md) — Cart interface, API usage, state handling and frontend tests.
 - [Database Design](docs/database-design.md) — Tables, constraints and SQL design.
 - [Backend Architecture](docs/backend-architecture.md) — Backend structure and responsibilities.
 - [Frontend Catalog Design](docs/frontend-catalog-design.md) — Catalog UI and filtering.
@@ -214,8 +236,8 @@ Never commit `.env` files, database passwords or other credentials.
 
 ## Project Status
 
-The product catalog frontend and backend are implemented and tested.
+The product catalog and product detail frontend and backend are implemented.
 
-The guest shopping cart backend is also implemented, including all four REST operations: GET, POST, PATCH and DELETE.
+The guest shopping cart backend is implemented, including all four REST operations: GET, POST, PATCH and DELETE. The frontend includes Add to Cart controls, a dedicated cart page, quantity controls, item removal and cart navigation.
 
-The next development phase will focus on the shopping cart frontend, followed by orders and simulated checkout.
+The remaining shopping-cart work is to verify real browser-to-backend integration and complete end-to-end shopping workflows. Orders, inventory management during checkout and simulated payments remain future features.

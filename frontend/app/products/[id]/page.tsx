@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AddToCartButton from "@/components/AddToCartButton";
 
 type Product = {
   id: string;
@@ -120,6 +121,15 @@ export default async function ProductDetailPage({
 
                 {inStock ? "In stock" : "Out of stock"}
               </span>
+            </div>
+
+            <div className="mt-8">
+              <AddToCartButton
+                productId={id}
+                productName={product.name}
+                inStock={inStock}
+                compact={false}
+              />
             </div>
 
             <div className="mt-10 border-t border-violet-200 pt-8">

@@ -1,7 +1,6 @@
 # Database Design: Project Nebula
 
-> Living document. Only the database structures required for the current
-> development phase are documented in detail. Last updated: 2026-10-15
+> Living document. Only the database structures required for the current development phase are documented in detail. Last updated: 2026-10-27
 
 ## 1. Overview
 
@@ -33,13 +32,13 @@ Orders, payments, hotels and experiences remain future features.
 
 ### Purpose
 
-The `products` table stores items available in the fictional Puzzini Shop.
+The `products` table stores items available in the fictional Galaxy Shop.
 
 Each row represents one product.
 
 ### SQL Schema
 
-The current schema results from the two implemented SQL migrations.
+The current schema results from the implemented SQL migrations.
 
 ```sql
 CREATE TABLE products (
@@ -70,8 +69,7 @@ CREATE TABLE products (
 );
 ```
 
-This represents the resulting table structure. The actual migrations are
-stored separately and applied in order.
+This represents the resulting table structure. The actual migrations are stored separately and applied in order.
 
 ### Columns
 
@@ -96,13 +94,13 @@ Migration `004_create_carts.sql` introduces two tables.
 
 Stores guest cart records.
 
-| Column     | Type        | Constraint / Default    |
-| ---------- | ----------- | ----------------------- |
-| id         | BIGINT      | Identity primary key    |
-| token_hash | CHAR(64)    | NOT NULL, UNIQUE        |
-| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-| expires_at | TIMESTAMPTZ | NOT NULL                |
+| Column       | Type        | Constraint / Default    |
+| ------------ | ----------- | ----------------------- |
+| `id`         | BIGINT      | Identity primary key    |
+| `token_hash` | CHAR(64)    | NOT NULL, UNIQUE        |
+| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| `expires_at` | TIMESTAMPTZ | NOT NULL                |
 
 - The original access token is stored in an HttpOnly browser cookie.
 - PostgreSQL stores only its SHA-256 hash.
@@ -113,14 +111,14 @@ Stores guest cart records.
 
 Stores individual products belonging to guest carts.
 
-| Column     | Type        | Constraint / Default    |
-| ---------- | ----------- | ----------------------- |
-| id         | BIGINT      | Identity primary key    |
-| cart_id    | BIGINT      | NOT NULL, foreign key   |
-| product_id | BIGINT      | NOT NULL, foreign key   |
-| quantity   | INTEGER     | NOT NULL, CHECK 1–20    |
-| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| Column       | Type        | Constraint / Default    |
+| ------------ | ----------- | ----------------------- |
+| `id`         | BIGINT      | Identity primary key    |
+| `cart_id`    | BIGINT      | NOT NULL, foreign key   |
+| `product_id` | BIGINT      | NOT NULL, foreign key   |
+| `quantity`   | INTEGER     | NOT NULL, CHECK 1–20    |
+| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 
 Database constraints:
 
@@ -132,8 +130,7 @@ Database constraints:
 
 ### Cart Indexes
 
-`carts_expires_at_idx` indexes `carts(expires_at)` to support
-future cleanup of expired carts.
+`carts_expires_at_idx` indexes `carts(expires_at)` to support future cleanup of expired carts.
 
 Primary keys and unique constraints also provide indexes.
 
@@ -166,8 +163,7 @@ A product name cannot be NULL.
 
 However, `NOT NULL` alone does not reject empty strings such as `''`.
 
-The current database also uses CHECK constraints to reject empty or
-whitespace-only names and categories.
+The current database also uses CHECK constraints to reject empty or whitespace-only names and categories.
 
 Example:
 
@@ -217,8 +213,7 @@ For slugs:
 CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
 ```
 
-This restricts slugs to lowercase letters, digits and hyphens in the
-supported format.
+This restricts slugs to lowercase letters, digits and hyphens in the supported format.
 
 ### UNIQUE
 
@@ -276,8 +271,7 @@ This represents 3900 Pawstars.
 
 There are no fractional units.
 
-No additional currency column is needed while the application uses only
-Pawstars.
+No additional currency column is needed while the application uses only Pawstars.
 
 ## 5. Indexes
 
@@ -310,8 +304,7 @@ ORDER BY id ASC;
 - Not every query benefits from every index.
 - This index does not directly optimize all price or date sorting options.
 
-The usefulness of this index will be evaluated using actual queries and
-execution plans.
+The usefulness of this index will be evaluated using actual queries and execution plans.
 
 ### Performance Analysis
 
@@ -326,8 +319,7 @@ WHERE is_active = TRUE
 ORDER BY id ASC;
 ```
 
-Additional indexes will be considered only when justified by measured
-performance.
+Additional indexes will be considered only when justified by measured performance.
 
 ## 6. Sample Data
 
@@ -360,8 +352,7 @@ VALUES (
 );
 ```
 
-This example illustrates the current required columns, including `slug`.
-The actual seed file contains the project's fictional product dataset.
+This example illustrates the current required columns, including `slug`. The actual seed file contains the project's fictional product dataset.
 
 PostgreSQL automatically supplies:
 
@@ -395,7 +386,7 @@ Express API
 PostgreSQL
 ```
 
-The Next.js frontend is planned.
+The Next.js frontend communicates with Express over HTTP. The frontend never accesses PostgreSQL directly; database access and business logic remain in the backend.
 
 ### Security
 
@@ -414,18 +405,13 @@ The backend must handle BIGINT identifiers without precision loss.
 
 The `pg` library returns BIGINT values as strings by default.
 
-The current product API returns ID values as JSON strings and validates
-product IDs using `BigInt`.
+The current product API returns ID values as JSON strings and validates product IDs using `BigInt`.
 
 ### Transactions
 
-Transactions are already used in shopping cart database integration tests
-to isolate changes and roll them back.
+Transactions are used by shopping cart write operations to preserve data integrity and handle concurrent modifications safely. Integration tests also use transactions to isolate changes and roll them back.
 
-Cart API write operations will use transactions to preserve data integrity
-and handle concurrent modifications safely.
-
-They will be especially important for:
+Transactions will be especially important for:
 
 - Order creation
 - Stock updates
@@ -459,15 +445,13 @@ This migration adds:
 - `slug`: required, unique and validated
 - `image_url`: optional image URL or path
 
-Future migrations must account for existing records when adding required
-columns or modifying constraints.
+Future migrations must account for existing records when adding required columns or modifying constraints.
 
 ### Migration 003
 
 `003_update_product_catalog.sql`
 
-This migration updates product catalog content, including descriptions
-and image paths.
+This migration updates product catalog content, including descriptions and image paths.
 
 ### Migration 004
 
@@ -482,8 +466,7 @@ This migration creates:
 - Cascading deletion of cart items.
 - The index on cart expiration.
 
-Migration 004 has been applied to both the normal development database
-and the dedicated Neon testing database.
+Migration 004 has been applied to both the normal development database and the dedicated Neon testing database.
 
 Its constraints are verified by automated PostgreSQL integration tests.
 
@@ -502,8 +485,7 @@ Migration files:
 - Apply schema changes to PostgreSQL.
 - Track database structure over time.
 
-The project currently uses SQL migration files. An automated migration
-management system has not yet been introduced.
+The project currently uses SQL migration files. An automated migration management system has not yet been introduced.
 
 ### Database Branches
 
@@ -514,31 +496,28 @@ Neon is used with separate database branches.
 
 The backend reads its normal database connection from `DATABASE_URL`.
 
-Integration tests use `TEST_DATABASE_URL` to connect to the separate testing
-branch.
+Integration tests use `TEST_DATABASE_URL` to connect to the separate testing branch.
 
 Integration tests must not accidentally modify production data.
 
 ## 9. Open Decisions
 
-| Decision                            | Decide By                    |
-| ----------------------------------- | ---------------------------- |
-| BIGINT or INTEGER IDs               | Before first migration       |
-| Empty name and category constraints | Before first migration       |
-| Product categories                  | Before sample data insertion |
-| Product images                      | Before catalog frontend      |
-| Stock display                       | Before catalog frontend      |
-| Additional indexes                  | After performance analysis   |
-| User and cart tables                | Before cart implementation   |
-| Order and order item tables         | Before orders                |
-| Stock reservation strategy          | Before checkout              |
-| Payment records                     | Before simulated checkout    |
+| Decision                            | Status                                                 |
+| ----------------------------------- | ------------------------------------------------------ |
+| BIGINT or INTEGER IDs               | BIGINT implemented                                     |
+| Empty name and category constraints | Implemented                                            |
+| Product categories                  | Defined                                                |
+| Product images                      | `image_url` implemented; storage strategy remains open |
+| Stock display                       | Implemented in product interfaces                      |
+| Additional indexes                  | Evaluate after performance analysis                    |
+| User and cart tables                | Cart tables implemented; user table deferred           |
+| Order and order item tables         | Before orders                                          |
+| Stock reservation strategy          | Before checkout                                        |
+| Payment records                     | Before simulated checkout                              |
 
-The initial decisions about BIGINT IDs, empty name/category constraints and
-product categories have been implemented.
+The initial decisions about BIGINT IDs, empty name/category constraints and product categories have been implemented.
 
-The database now includes `image_url`, but actual image storage and hosting
-remain to be decided.
+The database now includes `image_url`, but actual image storage and hosting remain to be decided.
 
 ## 10. Future Database Expansion
 
@@ -551,16 +530,14 @@ Future e-commerce tables may include:
 - `order_items`
 - `payments`
 
-Hotel and experience functionality will require additional tables and
-relationships.
+Hotel and experience functionality will require additional tables and relationships.
 
 Their database structures have not yet been designed.
 
-Foreign keys, transactions and business constraints will be defined as the
-corresponding features are implemented.
+Foreign keys, transactions and business constraints will be defined as the corresponding features are implemented.
 
 ---
 
 **Document status:** Product and guest cart database schemas implemented.
 
-Migrations 001–004 are present. The cart API is still under development.
+Migrations 001–004 are present. The cart backend API is implemented; browser-to-backend and full end-to-end verification remain separate tasks.

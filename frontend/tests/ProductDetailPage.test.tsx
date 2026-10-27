@@ -147,7 +147,11 @@ describe("ProductDetailPage", () => {
 
     render(await ProductDetailPage(pageProps("12")));
 
-    expect(screen.getByText("Out of stock")).toBeInTheDocument();
+    expect(screen.getAllByText("Out of stock")).toHaveLength(2);
+
+    expect(
+      screen.getByRole("button", { name: "Add Comet Stroller to cart" }),
+    ).toBeDisabled();
   });
 
   it("provides a link back to the product catalog", async () => {
