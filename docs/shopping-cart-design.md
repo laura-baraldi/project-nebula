@@ -10,7 +10,7 @@ Technology stack:
 - PostgreSQL
 - Parameterized SQL without an ORM
 
-This branch covers the backend API only. The frontend will be developed separately.
+The backend API is implemented. The frontend interface is documented separately in [Shopping Cart Frontend Design](./shopping-cart-frontend-design.md).
 
 ## 2. Scope
 
@@ -27,14 +27,16 @@ This branch covers the backend API only. The frontend will be developed separate
 - Cookie and CSRF security
 - Automated tests
 
-### Out of Scope
+### Separate or Out of Scope
 
 - User authentication
 - Checkout and payments
 - Orders
 - Shipping
 - Inventory reservations
-- Frontend cart interface
+- Complete end-to-end browser-to-backend verification
+
+The shopping cart frontend interface is implemented separately from this backend design.
 
 ## 3. Cart Ownership and Identification
 
@@ -47,7 +49,7 @@ This branch covers the backend API only. The frontend will be developed separate
 
 ### Cart Creation
 
-- GET /api/cart returns an empty cart when no cart exists.
+- GET `/api/cart` returns an empty cart when no cart exists.
 - Opening an empty cart does not create a database record.
 - A cart is created when the first valid product is added.
 - Invalid additions must not create a cart.
@@ -90,7 +92,7 @@ This branch covers the backend API only. The frontend will be developed separate
 - Unavailable items must be identified in the API response.
 - Unavailable products cannot have their quantities increased.
 - Visitors can reduce quantities or remove unavailable items.
-- The frontend will display availability warnings.
+- The frontend displays availability warnings.
 
 ### Prices and Totals
 
@@ -104,8 +106,7 @@ This branch covers the backend API only. The frontend will be developed separate
 
 ## 6. Database Design
 
-Two cart tables have been implemented in PostgreSQL:
-`carts` and `cart_items`.
+Two cart tables have been implemented in PostgreSQL: `carts` and `cart_items`.
 
 ### carts
 
@@ -133,8 +134,7 @@ Database constraints:
 - Enforce valid quantities.
 - Maintain relationships between carts, items and products.
 
-The schema was created using SQL migration
-`004_create_carts.sql`.
+The schema was created using SQL migration `004_create_carts.sql`.
 
 ## 7. REST API
 
@@ -161,8 +161,7 @@ All four shopping cart endpoints are implemented.
 - Successful modifications renew the seven-day expiration.
 - Errors use the project's standard JSON error format.
 
-For request bodies, response examples and HTTP error codes,
-see [API Design](./api-design.md).
+For request bodies, response examples and HTTP error codes, see [API Design](./api-design.md).
 
 ## 8. Security
 
@@ -179,7 +178,7 @@ see [API Design](./api-design.md).
 - Validate product IDs and quantities.
 - Do not expose internal errors or sensitive tokens.
 
-Security measures must be tested before the API is considered complete.
+Security measures must continue to be verified through automated tests and deployment checks.
 
 ## 9. Concurrency and Data Integrity
 
@@ -191,8 +190,7 @@ Security measures must be tested before the API is considered complete.
 
 ## 10. Testing Strategy
 
-Automated unit, HTTP and PostgreSQL integration tests cover
-the main cart operations, validation rules and error scenarios.
+Automated unit, HTTP and PostgreSQL integration tests cover the main cart operations, validation rules and error scenarios.
 
 - Empty and existing carts
 - Cart creation and persistence
@@ -209,7 +207,9 @@ the main cart operations, validation rules and error scenarios.
 - Database constraints
 - Transactions and concurrent updates
 
-PostgreSQL integration tests will use the separate testing database.
+PostgreSQL integration tests use a separate testing database.
+
+Frontend component tests are documented in [Shopping Cart Frontend Design](./shopping-cart-frontend-design.md). Real browser-to-backend verification remains a separate step.
 
 ## 11. Design Status
 
@@ -240,10 +240,10 @@ PostgreSQL integration tests will use the separate testing database.
 
 ### API Endpoints
 
-- [x] Implement GET /api/cart.
-- [x] Implement POST /api/cart/items.
-- [x] Implement PATCH /api/cart/items/:productId.
-- [x] Implement DELETE /api/cart/items/:productId.
+- [x] Implement GET `/api/cart`.
+- [x] Implement POST `/api/cart/items`.
+- [x] Implement PATCH `/api/cart/items/:productId`.
+- [x] Implement DELETE `/api/cart/items/:productId`.
 - [x] Implement quantity and stock validation.
 - [x] Calculate prices, subtotals and totals.
 - [x] Preserve unavailable items in existing carts.
@@ -251,7 +251,7 @@ PostgreSQL integration tests will use the separate testing database.
 ### Testing
 
 - [x] Add token and cookie unit tests.
-- [x] Add repository unit tests for all cart operations.
+- [x] Add repository unit tests for cart operations.
 - [x] Add HTTP tests for all four endpoints.
 - [x] Add PostgreSQL integration tests for GET, POST, PATCH and DELETE.
 - [x] Test expiration, validation errors and rollback behavior.
@@ -264,5 +264,6 @@ PostgreSQL integration tests will use the separate testing database.
 - [x] Document API contracts and business rules.
 - [x] Update the project README.
 - [ ] Complete final test and CI verification.
+- [ ] Verify the complete browser-to-backend shopping flow.
 - [ ] Open and review the pull request.
 - [ ] Merge the completed branch into main.

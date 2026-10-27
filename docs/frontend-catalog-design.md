@@ -4,7 +4,7 @@
 
 The product catalog is built with Next.js, React, TypeScript and Tailwind CSS. Product data is retrieved from the existing Express REST API.
 
-This document describes the planned frontend behavior and design decisions for product discovery.
+This document describes the implemented frontend behavior and design decisions for product discovery.
 
 ## 2. Goals
 
@@ -32,7 +32,9 @@ On mobile and tablet, category filters appear in a collapsible "Categories" menu
 
 Both the desktop sidebar and the collapsible mobile menu use the same category navigation. Only their presentation differs.
 
-The existing `ProductCard` component remains responsible for displaying individual product information.
+The existing `ProductCard` component remains responsible for displaying individual product information and navigation to product detail pages.
+
+Product interfaces also provide Add to Cart functionality. Cart management itself is documented separately in [Shopping Cart Frontend Design](./shopping-cart-frontend-design.md).
 
 ## 4. Category Filtering
 
@@ -154,11 +156,12 @@ Search, category filters and sorting controls must remain usable on smaller scre
 - PostgreSQL provides product data.
 - The frontend does not query PostgreSQL directly.
 - Existing product cards and image assets are reused.
-- No database schema changes are required.
+- Add to Cart controls use the shopping cart API.
+- No database schema changes are required for catalog interactions.
 
 ## 11. Testing
 
-Automated tests must cover:
+Automated tests should cover:
 
 - Category selection and clearing.
 - Search submission and empty searches.
@@ -175,14 +178,13 @@ Tests should run in the existing Frontend CI workflow.
 
 ## 12. Out of Scope
 
-The following features are not part of this branch:
+The following features are not part of the catalog feature itself:
 
-- Individual product detail pages.
-- Shopping cart.
+- Shopping cart management page and quantity controls, documented separately.
 - User authentication.
 - Checkout and payments.
 - Advanced multi-category filtering.
 - Price range controls.
-- End-to-end browser testing.
+- Complete end-to-end browser testing.
 
-These features will be implemented separately.
+Individual product detail pages are documented in [Product Detail Design](./product-detail-design.md). Add to Cart functionality is covered by [Shopping Cart Frontend Design](./shopping-cart-frontend-design.md).

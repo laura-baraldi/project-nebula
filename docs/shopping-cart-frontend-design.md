@@ -8,6 +8,8 @@ It communicates with the existing Express Shopping Cart API.
 
 The frontend does not access PostgreSQL directly or manage secret cart tokens.
 
+The cart interface includes Add to Cart controls, a dedicated cart page, quantity controls, item removal and cart navigation. Browser-to-backend integration must be verified separately.
+
 ## 2. Goals
 
 - Allow visitors to add products to their cart.
@@ -25,6 +27,7 @@ The frontend does not access PostgreSQL directly or manage secret cart tokens.
 - Disable adding products with no available stock.
 - Show loading, success and error feedback.
 - Prevent repeated submissions while a request is pending.
+- Use the backend response to update cart-related UI state.
 
 ### Cart Page — `/cart`
 
@@ -42,11 +45,15 @@ Display:
 
 Provide links back to the product catalog.
 
+Quantity changes and item removal must use the corresponding backend API operations. The UI must reflect the returned cart rather than calculating authoritative prices or totals independently.
+
 ### Cart Navigation
 
 Add a cart link to the site navigation.
 
-A cart item-count badge may be added after the core functionality is working.
+Cart update notifications allow interested components to respond when cart data changes.
+
+A cart item-count badge may be added separately if it is not already implemented.
 
 ## 4. API Integration
 
@@ -98,7 +105,7 @@ The backend remains responsible for validation, prices, totals and stock rules.
 
 ## 8. Testing
 
-Automated tests should cover:
+Automated frontend tests should cover:
 
 - API client requests and errors.
 - Add to Cart loading, success and failure.
@@ -106,23 +113,25 @@ Automated tests should cover:
 - Empty cart rendering.
 - Unavailable items and stock conflicts.
 - Cart loading and retry behavior.
-- Responsive and accessible controls.
+- Cart navigation and update notifications.
+- Component behavior and accessible controls.
 
-Use Vitest, React Testing Library and mocked API responses.
+Use Vitest, React Testing Library and mocked API responses for isolated component tests.
 
-Real browser-to-backend integration will be verified separately.
+Real browser-to-backend integration must be verified separately. Passing mocked component tests does not prove that browser cookies, CORS, API configuration and backend requests work together.
 
 ## 9. Implementation Plan
 
 - [x] Create `lib/cartApi.ts`.
-- [x] Add API client tests with full coverage.
-- [ ] Implement Add to Cart buttons.
-- [ ] Create the `/cart` page.
-- [ ] Implement quantity controls and item removal.
-- [ ] Add cart navigation.
-- [ ] Complete component tests.
-- [ ] Verify backend integration in the browser.
-- [ ] Update README and documentation.
+- [x] Add API client tests.
+- [x] Implement Add to Cart controls.
+- [x] Create the `/cart` page.
+- [x] Implement quantity controls and item removal.
+- [x] Add cart navigation and update notifications.
+- [x] Add component tests for cart behavior.
+- [ ] Verify the complete cart flow in a browser connected to the backend.
+- [ ] Verify all frontend tests, lint, TypeScript and production build.
+- [x] Update README and related documentation.
 - [ ] Open and merge the frontend pull request.
 
 ## 10. Out of Scope

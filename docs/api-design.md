@@ -1,6 +1,6 @@
 # API Design — Project Nebula
 
-> API reference and current implementation status. Updated: 2026-10-25.
+> API reference and current implementation status. Updated: 2026-10-27.
 > Detailed database schema: [Database Design](./database-design.md). Detailed cart rules: [Shopping Cart Design](./shopping-cart-design.md).
 
 ## 1. Overview
@@ -16,7 +16,11 @@ Project Nebula is a fictional e-commerce platform for products from a planet inh
 
 The frontend and backend are separate. Only Express accesses PostgreSQL; database credentials must never reach the frontend. Local development uses frontend `http://localhost:3000` and API `http://localhost:4000`.
 
-**Implemented:** product catalog API and frontend; guest cart backend (GET, POST, PATCH, DELETE). **Planned:** cart frontend, orders, inventory checkout, simulated payments and any authentication required later. Hotels and Experiences are explicitly outside the current scope.
+**Implemented:** product catalog API and frontend; product detail pages; guest cart backend (GET, POST, PATCH, DELETE); shopping cart interface and component tests.
+
+**Remaining verification:** complete browser-to-backend integration and end-to-end shopping workflows.
+
+**Planned:** orders, inventory checkout, simulated payments and any authentication required later. Hotels and Experiences are explicitly outside the current scope.
 
 ## 2. API Conventions
 
@@ -35,7 +39,7 @@ The frontend and backend are separate. Only Express accesses PostgreSQL; databas
 }
 ```
 
-Typical HTTP statuses: `200` success, `201` created, `204` no response body (where applicable), `400` invalid input, `401` unauthenticated (future protected endpoints), `403` forbidden/origin rejected, `404` not found, `409` business conflict, `415` unsupported content type, `429` rate-limited (future), `500` unexpected error. Individual endpoint sections specify actual implemented codes.
+Typical HTTP statuses: `200` success, `201` created, `204` no response body where applicable, `400` invalid input, `401` unauthenticated for future protected endpoints, `403` forbidden/origin rejected, `404` not found, `409` business conflict, `415` unsupported content type, `429` rate-limited if enabled for a future endpoint, `500` unexpected error. Individual endpoint sections specify actual implemented codes.
 
 ### Pagination and sorting
 
@@ -123,7 +127,7 @@ The implemented catalog frontend preserves `category`, `q`, `sort`, and `page` i
 
 ### GET `/api/products/:id`
 
-Returns one active product using the product object shape shown above (without pagination metadata). The path ID must be a positive decimal integer **without leading zeros**, within signed PostgreSQL `BIGINT` range.
+Returns one active product using the product object shape shown above, without pagination metadata. The path ID must be a positive decimal integer **without leading zeros**, within signed PostgreSQL `BIGINT` range.
 
 Responses: `200` product; `400 INVALID_PRODUCT_ID` for invalid ID; `404 PRODUCT_NOT_FOUND` for missing or inactive product; `500 INTERNAL_SERVER_ERROR` for unexpected failure.
 
@@ -171,7 +175,10 @@ An empty cart returns `{"items":[],"total_pawstars":0}`. Backend prices and tota
 Requires `Content-Type: application/json` and a trusted `Origin`.
 
 ```json
-{ "product_id": "1", "quantity": 2 }
+{
+  "product_id": "1",
+  "quantity": 2
+}
 ```
 
 - Request body must have **exactly** those two fields: valid positive BIGINT ID string and integer quantity 1–20.
@@ -185,7 +192,9 @@ Requires `Content-Type: application/json` and a trusted `Origin`.
 Requires a valid existing cart cookie, trusted `Origin`, and JSON body:
 
 ```json
-{ "quantity": 2 }
+{
+  "quantity": 2
+}
 ```
 
 - `productId` must be a valid positive BIGINT path ID. Body must contain **only** integer `quantity` from 1 to 20.
@@ -211,7 +220,7 @@ Requires a valid existing cart cookie and trusted `Origin`. No JSON request body
 - The API validates data on the backend. SQL is parameterized. CORS allows the configured frontend origin; state-changing requests require its trusted `Origin` as CSRF protection.
 - The cookie belongs to the browser; guest carts are **not automatically shared across devices**.
 
-For schema, reasoning and lifecycle details, use [Shopping Cart Design](./shopping-cart-design.md), rather than repeating them here.
+For schema, reasoning and lifecycle details, use [Shopping Cart Design](./shopping-cart-design.md), rather than repeating them here. For frontend implementation details, see [Shopping Cart Frontend Design](./shopping-cart-frontend-design.md).
 
 ## 6. Orders, Checkout and Authentication — Planned
 
@@ -223,9 +232,10 @@ Authentication endpoints have **not** been defined. Before protected features ar
 
 - **Unit / isolated HTTP tests:** Vitest and Supertest test validation, API status codes, cookie behavior, and repository branches using mocks. Mocked repository tests do **not** prove SQL behavior against PostgreSQL.
 - **Integration tests:** dedicated Neon `testing` database for real SQL and Supertest → Express → PostgreSQL. Cart tests check CRUD behavior, expiration, stock rules, transactions and selected concurrent operations.
-- **Future E2E tests:** complete browser workflows after the relevant frontend screens exist.
+- **Frontend component tests:** Vitest and React Testing Library test UI behavior and mocked API responses. These tests do not replace real browser-to-backend verification.
+- **End-to-end verification:** verify complete browser workflows across the catalog, product detail and cart interfaces, including real browser-to-backend interactions.
 
-From `backend` on Windows PowerShell:
+From `backend` on Windows:
 
 ```powershell
 npm.cmd run build
@@ -237,16 +247,16 @@ node --env-file=.env node_modules/vitest/vitest.mjs run --config vitest.integrat
 
 ## 8. Roadmap and Open Decisions
 
-| Area                                                         | Status / next work                |
-| ------------------------------------------------------------ | --------------------------------- |
-| Product catalog API, listing, details and frontend           | Implemented                       |
-| Guest cart GET, POST, PATCH, DELETE backend                  | Implemented and tested            |
-| Cart frontend and complete cart user flow                    | Planned                           |
-| Additional cart integration edge cases and end-to-end checks | Review before merging             |
-| Authentication                                               | Decide if required                |
-| Orders, stock management and simulated checkout              | Planned                           |
-| Full e-commerce E2E coverage                                 | Planned                           |
-| Hotels and Experiences                                       | Deferred, separate future modules |
+| Area                                               | Status / next work                            |
+| -------------------------------------------------- | --------------------------------------------- |
+| Product catalog API, listing, details and frontend | Implemented                                   |
+| Guest cart GET, POST, PATCH, DELETE backend        | Implemented and tested                        |
+| Shopping cart frontend and components              | Implemented; integration verification remains |
+| Real browser-to-backend cart workflow              | Verify before merging                         |
+| Complete shopping end-to-end tests                 | Planned                                       |
+| Authentication                                     | Decide if required                            |
+| Orders, stock management and simulated checkout    | Planned                                       |
+| Hotels and Experiences                             | Deferred, separate future modules             |
 
 Open decisions: whether to require customer accounts; authentication and authorization approach; inventory reservation during checkout; order cancellation and status transitions; simulated payment states; administrative API; product image storage. Product categories are already defined; the `image_url` field exists but an image-storage solution is not implemented.
 
@@ -255,7 +265,8 @@ Open decisions: whether to require customer accounts; authentication and authori
 - **2026-10-12:** Start with product e-commerce; defer Hotels/Experiences. Use a separate Express backend, PostgreSQL without an ORM, integer Pawstars, server-side pagination, predictable validation and deterministic sorting. Return `200` for valid empty result sets and simulate payments only.
 - **2026-10-12:** Keep database schema documentation in a separate file to avoid duplication.
 - **2026-10-15:** Product catalog API implemented; separate Neon testing branch and Vitest configurations added.
-- **2026-10-25:** Guest shopping cart backend endpoints GET/POST/PATCH/DELETE implemented and exercised by isolated and PostgreSQL integration tests. Cart frontend and checkout remain future work.
+- **2026-10-25:** Guest shopping cart backend endpoints GET/POST/PATCH/DELETE implemented and exercised by isolated and PostgreSQL integration tests.
+- **2026-10-27:** Shopping cart frontend components and interface documented as implemented. Real browser-to-backend integration and complete end-to-end shopping workflows remain to be verified.
 
 ---
 

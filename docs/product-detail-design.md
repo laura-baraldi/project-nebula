@@ -6,7 +6,7 @@ Product detail pages allow users to view additional information about individual
 
 The frontend uses Next.js, React, TypeScript and Tailwind CSS, retrieving product data from the existing Express REST API.
 
-This feature builds on the completed product catalog without introducing cart or checkout functionality.
+The product detail interface includes product information, availability and Add to Cart functionality. Cart management is documented separately.
 
 ## 2. Goals
 
@@ -60,8 +60,9 @@ The detail page displays:
 - Description
 - Price in Pawstars (PWS)
 - Stock availability
+- Add to Cart control
 
-The backend already provides the necessary fields.
+The backend already provides the necessary product fields.
 
 ### Stock Availability
 
@@ -72,7 +73,9 @@ Initially, availability is displayed as:
 
 Exact stock quantities are not displayed to customers.
 
-No purchasing functionality is included in this feature.
+The Add to Cart control must not allow a visitor to add a product that is out of stock. The backend remains authoritative and revalidates product availability and stock when the request is received.
+
+Cart behavior is documented in [Shopping Cart Frontend Design](./shopping-cart-frontend-design.md).
 
 ## 5. Layout and Responsive Design
 
@@ -130,6 +133,8 @@ Relevant fields:
 - `404 PRODUCT_NOT_FOUND`: product does not exist or is inactive.
 - `500 INTERNAL_SERVER_ERROR`: unexpected server error.
 
+Add to Cart uses the separate shopping cart API documented in [API Design](./api-design.md).
+
 The Next.js frontend does not query PostgreSQL directly.
 
 No database schema changes are required.
@@ -180,13 +185,15 @@ Product cards use Next.js Link to navigate to individual detail pages.
 
 The product detail route validates the ID before requesting data from Express.
 
-Invalid IDs and missing or inactive products trigger Next.js notFound().
+Invalid IDs and missing or inactive products trigger Next.js `notFound()`.
 
 The product detail loading skeleton follows the same responsive layout as the page.
 
-Unexpected API and network errors are handled by the shared products/error.tsx boundary, which provides a retry action.
+Unexpected API and network errors are handled by the shared `products/error.tsx` boundary, which provides a retry action.
 
-A separate [id]/error.tsx is not required.
+A separate `[id]/error.tsx` is not required.
+
+Add to Cart controls communicate with the cart API through the frontend cart API module. Cart updates and error handling are described in the shopping cart frontend document.
 
 ## 9. Testing
 
@@ -203,25 +210,27 @@ Automated tests should cover:
 - API errors.
 - Loading state.
 - Navigation back to the catalog.
+- Add to Cart behavior, including loading, success, failure and unavailable products.
 
 Tests use Vitest and React Testing Library.
 
 Existing catalog tests must continue to pass.
 
+Component tests using mocked API responses do not replace verification of the complete browser-to-backend flow.
+
 ## 10. Out of Scope
 
-This feature does not include:
+The following are separate features or future work:
 
-- Shopping cart
-- Add to cart functionality
-- Checkout or payments
-- Authentication
-- Product reviews
-- Product image galleries
-- Related product recommendations
-- Inventory management
+- Shopping cart management page and quantity controls.
+- Checkout or payments.
+- Authentication.
+- Product reviews.
+- Product image galleries.
+- Related product recommendations.
+- Inventory management.
 
-These features may be implemented separately.
+Add to Cart controls are part of the product interface; cart management is documented separately.
 
 ## 11. Implementation Status
 
@@ -232,10 +241,6 @@ These features may be implemented separately.
 5. [x] Implement stock availability display.
 6. [x] Implement not-found, loading and error states.
 7. [x] Add automated tests.
-8. [x] Validate frontend tests, coverage, lint, TypeScript and production build.
-9. [x] Update project documentation.
+8. [x] Implement Add to Cart controls on product interfaces.
+9. [ ] Verify the complete browser-to-backend shopping flow.
 10. [ ] Open and merge the pull request.
-
-```
-
-```
