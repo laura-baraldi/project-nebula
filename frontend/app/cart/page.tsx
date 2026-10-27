@@ -35,8 +35,15 @@ export default function CartPage() {
   }, []);
 
   useEffect(() => {
-    void loadCart();
-  }, [loadCart]);
+    void getCart()
+      .then((data) => setCart(data))
+      .catch(() => {
+        setError("Could not load your cart. Please try again.");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, []);
 
   // Use the updated cart returned by the backend.
   async function changeQuantity(productId: string, quantity: number) {
