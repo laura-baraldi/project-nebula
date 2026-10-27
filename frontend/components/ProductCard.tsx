@@ -19,13 +19,13 @@ export default function ProductCard({
   imageUrl,
 }: ProductCardProps) {
   return (
-    <article className="overflow-hidden rounded-2xl bg-white shadow-sm">
+    <article className="h-full overflow-hidden rounded-2xl bg-white shadow-sm">
       <Link
         href={`/products/${id}`}
-        className="block h-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
+        className="flex h-full flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-700"
         aria-label={`View ${name} details`}
       >
-        <div className="relative aspect-square bg-violet-100">
+        <div className="relative aspect-square w-full shrink-0 bg-violet-100">
           <Image
             src={imageUrl}
             alt={name}
@@ -35,14 +35,16 @@ export default function ProductCard({
           />
         </div>
 
-        <div className="p-6">
+        <div className="flex flex-1 flex-col p-6">
           <p className="text-sm uppercase text-violet-500">{category}</p>
 
           <h2 className="mt-3 text-xl font-bold text-violet-900">{name}</h2>
 
           <p className="mt-3 text-sm text-gray-600">{description}</p>
 
-          <p className="mt-5 font-semibold text-violet-700">{price} PWS</p>
+          <p className="mt-auto pt-5 font-semibold text-violet-700">
+            {price} PWS
+          </p>
         </div>
       </Link>
     </article>
