@@ -69,7 +69,10 @@ export async function ProductsContent({
   const query = buildProductQuery(filters);
 
   // Retrieve filtered, sorted and paginated products from Express.
-  const response = await fetch(`http://localhost:4000/api/products?${query}`, {
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+  const response = await fetch(`${API_BASE_URL}/api/products?${query}`, {
     cache: "no-store",
   });
 
