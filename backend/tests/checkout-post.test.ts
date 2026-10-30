@@ -56,7 +56,7 @@ function checkoutRequest(
   token: string | null = TOKEN,
 ) {
   const req = request(app)
-    .post("/api/checkout")
+    .post("/api/cart/checkout")
     .set("Origin", ORIGIN)
     .set("Content-Type", "application/json");
 
@@ -72,7 +72,7 @@ beforeEach(() => {
   mockCheckout.mockResolvedValue(ORDER);
 });
 
-describe("POST /api/checkout", () => {
+describe("POST /api/cart/checkout", () => {
   it("creates an order and returns HTTP 201", async () => {
     const response = await checkoutRequest();
 
@@ -106,7 +106,7 @@ describe("POST /api/checkout", () => {
 
   it("rejects requests from untrusted origins", async () => {
     const response = await request(app)
-      .post("/api/checkout")
+      .post("/api/cart/checkout")
       .set("Origin", "https://malicious.example")
       .send({ customer_email: "test@example.com" });
 
@@ -117,7 +117,7 @@ describe("POST /api/checkout", () => {
 
   it("rejects requests without an Origin", async () => {
     const response = await request(app)
-      .post("/api/checkout")
+      .post("/api/cart/checkout")
       .send({ customer_email: "test@example.com" });
 
     expect(response.status).toBe(403);
@@ -127,7 +127,7 @@ describe("POST /api/checkout", () => {
 
   it("rejects non-JSON requests", async () => {
     const response = await request(app)
-      .post("/api/checkout")
+      .post("/api/cart/checkout")
       .set("Origin", ORIGIN)
       .set("Content-Type", "text/plain")
       .send("customer_email=test@example.com");
@@ -161,7 +161,7 @@ describe("POST /api/checkout", () => {
   });
   it("rejects a missing cart cookie", async () => {
     const response = await request(app)
-      .post("/api/checkout")
+      .post("/api/cart/checkout")
       .set("Origin", ORIGIN)
       .set("Content-Type", "application/json")
       .send({ customer_email: "test@example.com" });
@@ -218,9 +218,7 @@ describe("POST /api/checkout", () => {
   });
 
   it("returns HTTP 500 without exposing unexpected errors", async () => {
-    mockCheckout.mockRejectedValueOnce(
-      new Error("Private database error"),
-    );
+    mockCheckout.mockRejectedValueOnce(new Error("Private database error"));
 
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -245,7 +243,3 @@ describe("POST /api/checkout", () => {
     }
   });
 });
-
-
-
-

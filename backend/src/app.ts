@@ -30,4 +30,4 @@ const apiCors = cors({
 });
 
 app.use("/api/cart", apiCors, cartRouter);
-app.use("/api/checkout", apiCors, checkoutRouter);
+app.use("/api/cart/checkout", apiCors, checkoutRouter);
