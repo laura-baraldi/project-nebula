@@ -49,6 +49,15 @@ const ORDER = {
   customer_email: "test@example.com",
   total_pawstars: 200,
   payment_status: "simulated" as const,
+  created_at: new Date("2026-10-30T12:00:00.000Z"),
+  items: [
+    {
+      product_name: "Test product",
+      quantity: 2,
+      unit_price_pawstars: 100,
+      line_total_pawstars: 200,
+    },
+  ],
 };
 
 function checkoutRequest(
@@ -77,7 +86,12 @@ describe("POST /api/cart/checkout", () => {
     const response = await checkoutRequest();
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual({ order: ORDER });
+    expect(response.body).toEqual({
+      order: {
+        ...ORDER,
+        created_at: ORDER.created_at.toISOString(),
+      },
+    });
 
     expect(mockCheckout).toHaveBeenCalledOnce();
     expect(mockCheckout).toHaveBeenCalledWith(

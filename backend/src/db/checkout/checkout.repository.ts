@@ -8,6 +8,13 @@ export interface CheckoutResult {
   customer_email: string;
   total_pawstars: number;
   payment_status: "simulated";
+  created_at: Date;
+  items: {
+    product_name: string;
+    quantity: number;
+    unit_price_pawstars: number;
+    line_total_pawstars: number;
+  }[];
 }
 
 interface CheckoutCartItem {
@@ -115,10 +122,11 @@ export async function checkout(
       `INSERT INTO orders (customer_email, total_pawstars)
        VALUES ($1, $2)
        RETURNING
-         order_number,
-         customer_email,
-         total_pawstars,
-         payment_status`,
+  order_number,
+  customer_email,
+  total_pawstars,
+  payment_status,
+  created_at`,
       [email, total],
     );
 
@@ -187,7 +195,15 @@ export async function checkout(
 
     await client.query("COMMIT");
 
-    return order;
+    return {
+      ...order,
+      items: items.map((item) => ({
+        product_name: item.name,
+        quantity: item.quantity,
+        unit_price_pawstars: item.price_pawstars,
+        line_total_pawstars: item.price_pawstars * item.quantity,
+      })),
+    };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

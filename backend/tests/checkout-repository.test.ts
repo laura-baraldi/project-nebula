@@ -30,6 +30,7 @@ const order = {
   customer_email: "test@example.com",
   total_pawstars: 200,
   payment_status: "simulated" as const,
+  created_at: new Date("2026-10-30T12:00:00.000Z"),
 };
 
 function setupCheckout(options?: {
@@ -147,7 +148,17 @@ describe("checkout", () => {
 
     const result = await checkout("token-hash", "  test@example.com  ");
 
-    expect(result).toEqual(order);
+    expect(result).toEqual({
+      ...order,
+      items: [
+        {
+          product_name: "Sphynx Toy",
+          quantity: 2,
+          unit_price_pawstars: 100,
+          line_total_pawstars: 200,
+        },
+      ],
+    });
 
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining("INSERT INTO orders"),
