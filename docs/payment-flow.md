@@ -101,7 +101,7 @@ The internal database ID and the public order number are separate concepts.
 
 Proposed endpoint:
 
-`POST /api/checkout`
+`POST /api/cart/checkout`
 
 The request contains the customer email address. It does not contain authoritative product prices or a client-calculated total.
 
@@ -117,6 +117,15 @@ The backend:
 8. Attempts to send the confirmation email after the database transaction commits.
 
 The exact request and response schemas will be documented before implementation.
+
+### Successful response
+
+The endpoint returns `201 Created` with an `order` object containing:
+
+- `order_number`
+- `customer_email`
+- `total_pawstars`
+- `payment_status` (`simulated`)
 
 ## 8. Email Confirmation
 
@@ -178,13 +187,12 @@ Database integration tests must use the existing isolated testing database setup
 
 ## 12. Design Status
 
-- [x] Simulated payment only.
-- [x] PostgreSQL persistence for orders.
-- [x] Order item snapshots.
-- [x] Email confirmation included in scope.
-- [ ] Finalize schema and transaction details.
-- [ ] Implement migration.
-- [ ] Implement backend checkout.
-- [ ] Implement email delivery.
-- [ ] Implement frontend checkout.
-- [ ] Complete tests and documentation.
+- [x] Simulated payment only
+- [x] PostgreSQL persistence for orders
+- [x] Order item snapshots
+- [x] Finalize schema and transaction details
+- [x] Implement migration
+- [x] Implement backend checkout
+- [ ] Implement email delivery
+- [ ] Implement frontend checkout
+- [ ] Complete tests and documentation

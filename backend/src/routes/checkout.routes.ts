@@ -11,7 +11,7 @@ export const checkoutRouter = Router();
 // Apply the same Origin protection used by cart modifications.
 checkoutRouter.use(cartSecurity);
 
-// POST /api/checkout
+// POST /api/cart/checkout
 checkoutRouter.post("/", async (req, res) => {
   try {
     if (!req.is("application/json")) {
