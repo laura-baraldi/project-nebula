@@ -1,7 +1,15 @@
 ﻿import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
-
 import { generateCartToken, hashCartToken } from "../src/cart-token.js";
+import { sendOrderConfirmationEmail } from "../src/email/email.service.js";
+
+const { sendEmailMock } = vi.hoisted(() => ({
+  sendEmailMock: vi.fn(),
+}));
+
+vi.mock("../src/email/email.service.js", () => ({
+  sendOrderConfirmationEmail: sendEmailMock,
+}));
 
 vi.mock("../src/db/pool.js", () => ({
   pool: {
@@ -40,6 +48,7 @@ import { CartBusinessError } from "../src/db/cart.repository.js";
 import { checkout } from "../src/db/checkout/checkout.repository.js";
 
 const mockCheckout = vi.mocked(checkout);
+const mockSendEmail = vi.mocked(sendOrderConfirmationEmail);
 
 const ORIGIN = "http://localhost:3000";
 const TOKEN = generateCartToken();
@@ -79,6 +88,7 @@ function checkoutRequest(
 beforeEach(() => {
   vi.resetAllMocks();
   mockCheckout.mockResolvedValue(ORDER);
+  mockSendEmail.mockResolvedValue(undefined);
 });
 
 describe("POST /api/cart/checkout", () => {
@@ -252,6 +262,37 @@ describe("POST /api/cart/checkout", () => {
       );
 
       expect(response.headers["set-cookie"]).toBeUndefined();
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it("sends an order confirmation email after checkout", async () => {
+    const response = await checkoutRequest();
+
+    expect(response.status).toBe(201);
+    expect(mockSendEmail).toHaveBeenCalledOnce();
+    expect(mockSendEmail).toHaveBeenCalledWith("test@example.com", "ORD-123");
+  });
+
+  it("keeps the order confirmed when the confirmation email fails", async () => {
+    mockSendEmail.mockRejectedValueOnce(
+      new Error("Resend service unavailable"),
+    );
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const response = await checkoutRequest();
+
+      expect(response.status).toBe(201);
+      expect(response.body.order.order_number).toBe("ORD-123");
+      expect(mockCheckout).toHaveBeenCalledOnce();
+      expect(mockSendEmail).toHaveBeenCalledOnce();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Failed to send order confirmation email:",
+        expect.any(Error),
+      );
     } finally {
       consoleSpy.mockRestore();
     }

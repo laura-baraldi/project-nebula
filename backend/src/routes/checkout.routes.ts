@@ -5,6 +5,7 @@ import { hashCartToken } from "../cart-token.js";
 import { cartSecurity } from "../cart-security.js";
 import { CartBusinessError } from "../db/cart.repository.js";
 import { checkout } from "../db/checkout/checkout.repository.js";
+import { sendOrderConfirmationEmail } from "../email/email.service.js";
 
 export const checkoutRouter = Router();
 
@@ -60,6 +61,14 @@ checkoutRouter.post("/", async (req, res) => {
 
     // The repository validates the email and performs the transaction.
     const order = await checkout(tokenHash, body.customer_email);
+
+    // Send the confirmation email after the order has been created.
+    // Email failures must not undo a successful checkout.
+    try {
+      await sendOrderConfirmationEmail(body.customer_email, order.order_number);
+    } catch (emailError) {
+      console.error("Failed to send order confirmation email:", emailError);
+    }
 
     // Keep the same cart token and renew its seven-day cookie.
     setCartCookie(res, token);
