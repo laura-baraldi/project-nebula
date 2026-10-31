@@ -162,16 +162,14 @@ describe("CartPage", () => {
       ).toHaveAttribute("href", "/products");
     });
 
-    it("shows a disabled checkout button", async () => {
+    it("links to the checkout page", async () => {
       mockLoadedCart();
 
       render(<CartPage />);
 
-      await screen.findByText("Comet Stroller");
-
       expect(
-        screen.getByRole("button", { name: "Proceed to Checkout" }),
-      ).toBeDisabled();
+        await screen.findByRole("link", { name: "Proceed to Checkout" }),
+      ).toHaveAttribute("href", "/checkout");
     });
   });
 });

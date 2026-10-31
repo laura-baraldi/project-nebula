@@ -8,7 +8,7 @@ It communicates with the existing Express Shopping Cart API.
 
 The frontend does not access PostgreSQL directly or manage secret cart tokens.
 
-The cart interface includes Add to Cart controls, a dedicated cart page, quantity controls, item removal and cart navigation. Browser-to-backend integration must be verified separately.
+The cart interface includes Add to Cart controls, a dedicated cart page, quantity controls, item removal and cart navigation. Checkout is implemented separately at `/checkout`.
 
 ## 2. Goals
 
@@ -17,6 +17,7 @@ The cart interface includes Add to Cart controls, a dedicated cart page, quantit
 - Allow quantity updates and item removal.
 - Preserve cart contents across refreshes.
 - Handle stock changes and unavailable products.
+- Provide a checkout flow and order confirmation.
 - Maintain the existing responsive pastel-purple design.
 
 ## 3. Pages and Components
@@ -43,17 +44,44 @@ Display:
 - Empty cart state.
 - Loading and error states.
 
-Provide links back to the product catalog.
+Provide links back to the product catalog and to checkout when the cart contains items.
 
 Quantity changes and item removal must use the corresponding backend API operations. The UI must reflect the returned cart rather than calculating authoritative prices or totals independently.
 
+### Checkout Page — `/checkout`
+
+The checkout page loads the existing guest cart and collects:
+
+- Customer email.
+- First and last name.
+- Shipping address.
+- City, postal code and country.
+- Optional address details and phone number.
+
+The page has two steps:
+
+1. Contact and shipping information.
+2. Simulated payment confirmation.
+
+The page clearly states that no real payment is processed and asks users not to enter real personal information. Submitted demo details are stored in the database.
+
+The payment step displays a fictional demo card. No card details are collected.
+
+### Order Confirmation
+
+After successful checkout, the confirmation screen displays:
+
+- Order number.
+- Confirmation email address.
+- Purchased products and quantities.
+- Total in Pawstars.
+- Notice that payment was simulated.
+
+The user can return to the product catalog.
+
 ### Cart Navigation
 
-Add a cart link to the site navigation.
-
 Cart update notifications allow interested components to respond when cart data changes.
-
-A cart item-count badge may be added separately if it is not already implemented.
 
 ## 4. API Integration
 
@@ -63,8 +91,11 @@ A cart item-count badge may be added separately if it is not already implemented
 | Add product     | POST `/api/cart/items`              |
 | Change quantity | PATCH `/api/cart/items/:productId`  |
 | Remove product  | DELETE `/api/cart/items/:productId` |
+| Create order    | POST `/api/cart/checkout`           |
 
-The `lib/cartApi.ts` module centralizes API calls and error handling.
+The `lib/cartApi.ts` module centralizes cart API calls and error handling.
+
+The `lib/checkoutApi.ts` module handles checkout requests and checkout errors.
 
 Browser requests use `credentials: "include"`.
 
@@ -83,6 +114,7 @@ The backend remains responsible for validation, prices, totals and stock rules.
 - Visitors may reduce or remove unavailable products.
 - Increasing unavailable products is not allowed.
 - Frontend validation improves usability but does not replace backend validation.
+- Checkout rechecks availability and stock on the backend.
 
 ## 6. State and Error Handling
 
@@ -94,6 +126,9 @@ The backend remains responsible for validation, prices, totals and stock rules.
 - Allow retrying failed operations.
 - Refreshing the page retrieves the persisted cart from the backend.
 - The first implementation does not use localStorage for cart persistence.
+- After successful checkout, update the frontend cart state to an empty cart.
+- Display the order confirmation using the order returned by the backend.
+- If checkout fails, display the API error and allow the user to retry.
 
 ## 7. Security and Deployment
 
@@ -102,6 +137,8 @@ The backend remains responsible for validation, prices, totals and stock rules.
 - Keep the API URL configurable for different environments.
 - Verify CORS, trusted Origin and cookie behavior when deploying.
 - Preserve backend validation and authorization boundaries.
+- Do not collect real card details.
+- The checkout page warns users not to submit real personal information.
 
 ## 8. Testing
 
@@ -114,6 +151,11 @@ Automated frontend tests should cover:
 - Unavailable items and stock conflicts.
 - Cart loading and retry behavior.
 - Cart navigation and update notifications.
+- Checkout form and validation behavior.
+- Checkout API success and error handling.
+- Simulated payment step.
+- Order confirmation rendering.
+- Cart state after successful checkout.
 - Component behavior and accessible controls.
 
 Use Vitest, React Testing Library and mocked API responses for isolated component tests.
@@ -129,7 +171,12 @@ Real browser-to-backend integration must be verified separately. Passing mocked 
 - [x] Implement quantity controls and item removal.
 - [x] Add cart navigation and update notifications.
 - [x] Add component tests for cart behavior.
-- [ ] Verify the complete cart flow in a browser connected to the backend.
+- [x] Implement the `/checkout` page.
+- [x] Implement contact and shipping forms.
+- [x] Implement the simulated payment step.
+- [x] Implement the order confirmation screen.
+- [x] Connect checkout to the backend API.
+- [ ] Verify the complete cart and checkout flow in a browser connected to the backend.
 - [ ] Verify all frontend tests, lint, TypeScript and production build.
 - [x] Update README and related documentation.
 - [ ] Open and merge the frontend pull request.
@@ -137,8 +184,8 @@ Real browser-to-backend integration must be verified separately. Passing mocked 
 ## 10. Out of Scope
 
 - Customer accounts.
-- Checkout and payments.
-- Orders.
+- Real payment processing.
+- Shipping integrations.
 - Inventory reservation.
 - Cross-device cart synchronization.
 

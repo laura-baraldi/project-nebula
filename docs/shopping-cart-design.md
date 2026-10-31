@@ -12,6 +12,8 @@ Technology stack:
 
 The backend API is implemented. The frontend interface is documented separately in [Shopping Cart Frontend Design](./shopping-cart-frontend-design.md).
 
+Checkout is implemented separately and uses the existing guest cart.
+
 ## 2. Scope
 
 ### Included
@@ -26,13 +28,13 @@ The backend API is implemented. The frontend interface is documented separately 
 - Cart expiration
 - Cookie and CSRF security
 - Automated tests
+- Checkout and order creation
 
 ### Separate or Out of Scope
 
 - User authentication
-- Checkout and payments
-- Orders
-- Shipping
+- Real payment processing
+- Shipping integrations
 - Inventory reservations
 - Complete end-to-end browser-to-backend verification
 
@@ -64,6 +66,8 @@ The shopping cart frontend interface is implemented separately from this backend
 - A new successful addition after expiration creates a new cart.
 - Expired database records may be deleted through a separate cleanup process.
 - Removing the last item leaves an empty but valid cart.
+- Successful checkout deletes the cart items but retains the cart and its cookie.
+- Checkout renews the retained cart expiration for another seven days.
 
 ## 5. Business Rules
 
@@ -83,7 +87,8 @@ The shopping cart frontend interface is implemented separately from this backend
 - Insufficient stock returns HTTP 409 Conflict.
 - Failed operations leave the cart unchanged.
 - Adding products does not reserve or decrease inventory.
-- Stock is checked again during checkout in a future feature.
+- Stock is checked again during checkout.
+- Checkout locks the relevant product rows and decrements stock within the order transaction.
 
 ### Stock Changes and Inactive Products
 
@@ -103,10 +108,11 @@ The shopping cart frontend interface is implemented separately from this backend
 - Item subtotal = unit price × quantity.
 - Cart total = sum of item subtotals.
 - The frontend cannot provide or override prices or totals.
+- Checkout recalculates the total using current database prices.
 
 ## 6. Database Design
 
-Two cart tables have been implemented in PostgreSQL: `carts` and `cart_items`.
+The cart uses two PostgreSQL tables: `carts` and `cart_items`.
 
 ### carts
 
@@ -136,6 +142,8 @@ Database constraints:
 
 The schema was created using SQL migration `004_create_carts.sql`.
 
+Orders are stored separately in `orders` and `order_items`. See [Database Design](./database-design.md).
+
 ## 7. REST API
 
 All four shopping cart endpoints are implemented.
@@ -163,6 +171,18 @@ All four shopping cart endpoints are implemented.
 
 For request bodies, response examples and HTTP error codes, see [API Design](./api-design.md).
 
+### Checkout
+
+Checkout is implemented through:
+
+`POST /api/cart/checkout`
+
+It uses the existing guest cart cookie, validates customer and shipping details, rechecks stock and creates an order.
+
+The checkout transaction creates the order and item snapshots, updates stock and deletes the cart items. The cart itself is retained.
+
+See [Payment Flow](./payment-flow.md) for the checkout process.
+
 ## 8. Security
 
 - Use cryptographically secure random cart tokens.
@@ -187,6 +207,7 @@ Security measures must continue to be verified through automated tests and deplo
 - Prevent concurrent requests from corrupting cart quantities.
 - Preserve existing cart data when an operation fails.
 - Enforce important constraints in PostgreSQL, not only in TypeScript.
+- Checkout locks the cart and product rows to coordinate concurrent modifications and prevent stock overselling.
 
 ## 10. Testing Strategy
 
@@ -206,6 +227,7 @@ Automated unit, HTTP and PostgreSQL integration tests cover the main cart operat
 - Failed operations
 - Database constraints
 - Transactions and concurrent updates
+- Checkout stock validation and order creation
 
 PostgreSQL integration tests use a separate testing database.
 
@@ -225,6 +247,7 @@ Frontend component tests are documented in [Shopping Cart Frontend Design](./sho
 - [x] Choose REST operations.
 - [x] Define security requirements.
 - [x] Define transaction and testing requirements.
+- [x] Define checkout behavior.
 
 ## 12. Implementation Status
 
@@ -247,17 +270,20 @@ Frontend component tests are documented in [Shopping Cart Frontend Design](./sho
 - [x] Implement quantity and stock validation.
 - [x] Calculate prices, subtotals and totals.
 - [x] Preserve unavailable items in existing carts.
+- [x] Implement POST `/api/cart/checkout`.
+- [x] Create orders and order item snapshots.
+- [x] Validate and decrement stock during checkout.
+- [x] Retain the cart and cookie after checkout.
 
 ### Testing
 
 - [x] Add token and cookie unit tests.
 - [x] Add repository unit tests for cart operations.
-- [x] Add HTTP tests for all four endpoints.
-- [x] Add PostgreSQL integration tests for GET, POST, PATCH and DELETE.
+- [x] Add HTTP tests for all four cart endpoints.
+- [x] Add PostgreSQL integration tests for cart operations.
 - [x] Test expiration, validation errors and rollback behavior.
 - [x] Test stock conflicts and inactive products.
 - [x] Test selected concurrent cart operations.
-- [x] Configure GitHub Actions for backend build and tests.
 
 ### Documentation and Completion
 
