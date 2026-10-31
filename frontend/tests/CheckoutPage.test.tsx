@@ -305,4 +305,14 @@ describe("CheckoutPage", () => {
 
     expect(mockedCheckout).toHaveBeenCalledTimes(1);
   });
+
+  it("shows the fallback message when the cart is null without an error", async () => {
+    mockedGetCart.mockResolvedValue(null as unknown as Cart);
+
+    render(<CheckoutPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not load your cart.",
+    );
+  });
 });

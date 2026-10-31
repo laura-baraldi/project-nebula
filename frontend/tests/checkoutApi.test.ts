@@ -145,4 +145,58 @@ describe("Checkout API client", () => {
       message: "Checkout failed.",
     });
   });
+
+  it("omits optional shipping fields when they are undefined", async () => {
+    mockSuccess();
+
+    const shipping = {
+      ...mockShipping,
+      address_line2: undefined,
+      phone: undefined,
+    };
+
+    await checkout("test@example.com", shipping);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify({
+          customer_email: "test@example.com",
+          first_name: "Laura",
+          last_name: "Baraldi",
+          address_line1: "Via Roma 10",
+          city: "Milano",
+          postal_code: "20100",
+          country: "Italy",
+        }),
+      }),
+    );
+  });
+
+  it("omits optional shipping fields containing only whitespace", async () => {
+    mockSuccess();
+
+    const shipping = {
+      ...mockShipping,
+      address_line2: "   ",
+      phone: "   ",
+    };
+
+    await checkout("test@example.com", shipping);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify({
+          customer_email: "test@example.com",
+          first_name: "Laura",
+          last_name: "Baraldi",
+          address_line1: "Via Roma 10",
+          city: "Milano",
+          postal_code: "20100",
+          country: "Italy",
+        }),
+      }),
+    );
+  });
 });

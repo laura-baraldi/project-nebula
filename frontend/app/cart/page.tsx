@@ -289,13 +289,12 @@ export default function CartPage() {
                 is not available yet.
               </p>
 
-              <button
-                type="button"
-                disabled
-                className="mt-6 w-full rounded-xl bg-violet-700 px-5 py-3 text-center font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              <Link
+                href="/checkout"
+                className="mt-6 block w-full rounded-xl bg-violet-700 px-5 py-3 text-center font-semibold text-white hover:bg-violet-800"
               >
                 Proceed to Checkout
-              </button>
+              </Link>
             </aside>
           </div>
         )}
