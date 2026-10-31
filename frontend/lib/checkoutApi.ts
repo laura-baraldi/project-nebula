@@ -1,5 +1,16 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
+export type ShippingDetails = {
+  first_name: string;
+  last_name: string;
+  address_line1: string;
+  address_line2?: string;
+  city: string;
+  postal_code: string;
+  country: string;
+  phone?: string;
+};
+
 export type CheckoutOrderItem = {
   product_name: string;
   quantity: number;
@@ -38,7 +49,10 @@ export class CheckoutApiError extends Error {
   }
 }
 
-export async function checkout(customerEmail: string): Promise<CheckoutOrder> {
+export async function checkout(
+  customerEmail: string,
+  shipping: ShippingDetails,
+): Promise<CheckoutOrder> {
   const response = await fetch(`${API_BASE_URL}/api/cart/checkout`, {
     method: "POST",
     credentials: "include",
@@ -48,6 +62,14 @@ export async function checkout(customerEmail: string): Promise<CheckoutOrder> {
     },
     body: JSON.stringify({
       customer_email: customerEmail,
+      first_name: shipping.first_name,
+      last_name: shipping.last_name,
+      address_line1: shipping.address_line1,
+      address_line2: shipping.address_line2?.trim() || undefined,
+      city: shipping.city,
+      postal_code: shipping.postal_code,
+      country: shipping.country,
+      phone: shipping.phone?.trim() || undefined,
     }),
   });
 
