@@ -4,23 +4,24 @@
 
 The checkout flow converts a guest shopping cart into a persistent order.
 
-The application records orders in PostgreSQL and sends an order confirmation email. Payment is simulated: no real payment provider is integrated, no card details are collected, and no money is charged.
+The application records orders in PostgreSQL and attempts to send an order confirmation email. Payment is simulated: no real payment provider is integrated, no card details are collected, and no money is charged.
 
 The backend uses Node.js, Express, TypeScript, PostgreSQL and parameterized SQL without an ORM.
 
 ## 2. Scope
 
-### Included
+### Implemented
 
 - Guest checkout using the existing cart cookie.
 - Customer email collection and validation.
+- Shipping information collection.
 - Server-side product, price, quantity and stock validation.
 - Persistent orders and order items.
 - Order number generation.
 - Transactional order creation and stock updates.
 - Simulated payment status.
-- Order confirmation emails.
-- Automated unit, HTTP and database integration tests.
+- Order confirmation email attempt through Resend.
+- Checkout frontend and order confirmation screen.
 
 ### Out of Scope
 
@@ -40,18 +41,20 @@ The backend uses Node.js, Express, TypeScript, PostgreSQL and parameterized SQL 
 - Invalid or expired carts cannot be checked out.
 - Empty carts cannot create orders.
 - The backend recalculates the order total.
-- A successful checkout creates a persistent order with its item snapshots.
+- A successful checkout creates a persistent order with item snapshots.
 - Stock is decremented only when the order transaction succeeds.
-- The cart is cleared only after successful order creation.
+- Cart items are deleted only after successful order creation.
+- The cart record and browser cookie are retained.
+- The cart expiration is renewed for another seven days.
 - Failed transactions must not leave partial orders, incorrect stock or a partially cleared cart.
 
 ## 4. Database Design
 
-The implementation will introduce two tables through a new SQL migration.
+Migrations `005_create_orders.sql` and `006_add_shipping_details_to_orders.sql` introduce the order tables and shipping information.
 
 ### orders
 
-Stores the order-level information:
+Stores:
 
 - Internal database ID.
 - Unique, human-readable order number.
@@ -60,6 +63,7 @@ Stores the order-level information:
 - Payment status.
 - Total amount in Pawstars.
 - Creation timestamp.
+- Customer and shipping details.
 
 ### order_items
 
@@ -72,51 +76,68 @@ Stores an immutable snapshot of each purchased item:
 - Quantity.
 - Unit price in Pawstars at the time of checkout.
 
-Use foreign keys, CHECK constraints, appropriate indexes and NOT NULL constraints where applicable.
-
-Order items must preserve historical names and prices even if the product catalog changes later.
-
-The exact column definitions and deletion rules must be finalized against the existing schema before writing the migration.
+Order items preserve historical names and prices even if the product catalog changes later.
 
 ## 5. Order and Payment Statuses
 
-The initial flow must distinguish an order record from a real payment.
+The initial flow distinguishes an order record from a real payment.
 
 - Order status: `confirmed` after the simulated checkout succeeds.
 - Payment status: `simulated`.
 
-These values must never imply that an external payment was processed.
-
-A future payment provider may introduce additional payment states without requiring the existing order model to be discarded.
+These values never imply that an external payment was processed.
 
 ## 6. Order Number
 
 Each order receives a unique, human-readable order number.
 
-The number must be generated or allocated safely under concurrent requests. Database uniqueness must be enforced.
+PostgreSQL generates the number from the internal order ID using the `ORD-` prefix and zero-padding.
 
-The internal database ID and the public order number are separate concepts.
+Example:
+
+`ORD-00000001`
+
+The internal database ID and public order number are separate concepts.
 
 ## 7. Checkout API
 
-Proposed endpoint:
+Endpoint:
 
 `POST /api/cart/checkout`
 
-The request contains the customer email address. It does not contain authoritative product prices or a client-calculated total.
+The request must use JSON and include customer contact and shipping information.
+
+Required fields:
+
+- `customer_email`
+- `first_name`
+- `last_name`
+- `address_line1`
+- `city`
+- `postal_code`
+- `country`
+
+Optional fields:
+
+- `address_line2`
+- `phone`
+
+Unsupported fields are rejected. The request does not contain authoritative product prices or a client-calculated total.
 
 The backend:
 
 1. Validates the request and email.
 2. Resolves the guest cart using the existing cookie.
-3. Validates cart contents, product activity and stock.
-4. Reads current prices from PostgreSQL.
-5. Creates the order and item snapshots in a database transaction.
-6. Decrements stock and clears the cart within the same transaction.
-7. Returns the created order number, status and total.
-8. Attempts to send the confirmation email after the database transaction commits.
-
-The exact request and response schemas will be documented before implementation.
+3. Locks the cart and validates its expiration.
+4. Loads cart items and locks the relevant product rows.
+5. Rejects an empty cart.
+6. Checks product activity and stock.
+7. Reads current prices from PostgreSQL and calculates the total.
+8. Creates the order and item snapshots in a database transaction.
+9. Decrements stock.
+10. Deletes the cart items and renews the cart expiration.
+11. Commits the transaction.
+12. Attempts to send the confirmation email after commit.
 
 ### Successful response
 
@@ -125,36 +146,66 @@ The endpoint returns `201 Created` with an `order` object containing:
 - `order_number`
 - `customer_email`
 - `total_pawstars`
-- `payment_status` (`simulated`)
+- `payment_status`
+- `created_at`
+- `items`
+
+Each returned item includes its product name, quantity, unit price and line total.
+
+The payment status is `simulated`.
 
 ## 8. Email Confirmation
 
-The confirmation email includes:
+The backend uses Resend to attempt delivery of an order confirmation email.
 
-- Order number.
-- Order date.
-- Purchased products, quantities and unit prices.
-- Total in Pawstars.
-- A clear statement that payment was simulated and no money was charged.
+The email includes the order number and confirmation message.
 
-Use an email delivery provider through a backend-only integration. Credentials must be stored in environment variables and must never be exposed to the frontend.
+Backend environment variables:
 
-Email delivery failure must not roll back a successfully committed order. The failure must be logged safely and the design should allow email delivery to be retried.
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+
+Email delivery is attempted after the database transaction commits.
+
+Email delivery failure does not roll back a successfully committed order. The failure is logged separately.
 
 ## 9. Error Handling
 
 Expected cases include:
 
 - Invalid email or request: `400`.
-- Missing, expired or invalid cart: handled according to existing cart API conventions.
+- Missing, expired or invalid cart: `404`.
+- Empty cart: `409`.
 - Product unavailable or insufficient stock: `409`.
+- Unsupported content type: `415`.
 - Unexpected database or server failure: `500`.
 
-Errors must use the existing structured JSON error format and must not expose internal details.
+Errors use the existing structured JSON error format and must not expose internal details.
 
-## 10. Testing
+## 10. Frontend
 
-Tests must cover:
+The checkout page is available at `/checkout`.
+
+The flow has two steps:
+
+1. Contact and shipping information.
+2. Simulated payment confirmation.
+
+The checkout page explicitly warns users that no real payment is processed and asks them not to enter real personal information. Submitted demo details are stored in the database.
+
+The payment step displays a fictional demo card. No card information is entered or collected.
+
+After successful checkout, the order confirmation screen displays:
+
+- Order number.
+- Confirmation email address.
+- Purchased items and quantities.
+- Total in Pawstars.
+- A notice that payment was simulated.
+
+## 11. Testing
+
+Tests should cover:
 
 - Invalid email and request bodies.
 - Missing and expired cart cookies.
@@ -166,33 +217,29 @@ Tests must cover:
 - Correct order item snapshots.
 - Unique order numbers.
 - Stock updates.
-- Cart clearing after successful checkout.
-- Rollback when a database operation fails.
+- Cart item deletion after successful checkout.
+- Cart and cookie preservation.
+- Transaction rollback when a database operation fails.
 - Concurrent attempts to purchase limited stock.
-- Email success and email failure after order creation.
+- Email success and failure after order creation.
 - Confirmation that no real payment is attempted.
 
 Database integration tests must use the existing isolated testing database setup.
 
-## 11. Implementation Order
-
-1. Finalize this design against the existing backend and migrations.
-2. Create the order tables and constraints in a new SQL migration.
-3. Implement and test the transactional checkout service.
-4. Implement the checkout endpoint and validation.
-5. Implement the email delivery integration.
-6. Build the checkout and order confirmation frontend.
-7. Run the full relevant test suites and coverage checks.
-8. Update the database and API documentation.
-
-## 12. Design Status
+## 12. Implementation Status
 
 - [x] Simulated payment only
 - [x] PostgreSQL persistence for orders
 - [x] Order item snapshots
-- [x] Finalize schema and transaction details
-- [x] Implement migration
-- [x] Implement backend checkout
-- [ ] Implement email delivery
-- [ ] Implement frontend checkout
-- [ ] Complete tests and documentation
+- [x] Shipping details
+- [x] Order number generation
+- [x] Transactional checkout
+- [x] Stock validation and decrement
+- [x] Cart item deletion after successful checkout
+- [x] Cart and cookie preservation
+- [x] Checkout API
+- [x] Resend email integration attempt
+- [x] Checkout frontend
+- [x] Order confirmation screen
+
+---

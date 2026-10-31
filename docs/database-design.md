@@ -1,543 +1,254 @@
-# Database Design: Project Nebula
+# Project Nebula
 
-> Living document. Only the database structures required for the current development phase are documented in detail. Last updated: 2026-10-27
+Project Nebula is a fictional full-stack e-commerce platform set on a planet inhabited by hairless cats.
 
-## 1. Overview
+The project is built to practice REST API design, TypeScript, React, PostgreSQL, security, automated testing and frontend-backend communication.
 
-Project Nebula uses PostgreSQL hosted on Neon.
+All purchases and payments are simulated. The fictional currency is the Pawstar (PWS).
 
-The database stores persistent application data.
+## Tech Stack
 
-### Initial Scope
+| Layer    | Technologies                             |
+| -------- | ---------------------------------------- |
+| Frontend | Next.js, React, TypeScript, Tailwind CSS |
+| Backend  | Node.js, Express, TypeScript             |
+| Database | PostgreSQL (Neon), plain SQL             |
+| Testing  | Vitest, Supertest, React Testing Library |
+| CI       | GitHub Actions                           |
 
-The current database contains three tables:
+The frontend communicates with the Express API through HTTP. Database access and business logic remain in the backend.
 
-- `products`: product catalog, prices and stock.
-- `carts`: persistent guest shopping carts.
-- `cart_items`: products and quantities belonging to carts.
+## Features
 
-Orders, payments, hotels and experiences remain future features.
+### Implemented
 
-### Database Conventions
+**Product Catalog and Product Details**
 
-- Table names use plural `snake_case`.
-- Column names use `snake_case`.
-- Primary keys uniquely identify records.
-- Database constraints protect data integrity.
-- Timestamps use `TIMESTAMPTZ`.
-- Schema changes are tracked through SQL migrations.
-- The backend initially uses plain SQL without an ORM.
+- Product listing and individual product pages.
+- Category and price filtering.
+- Case-insensitive product search.
+- Sorting and server-side pagination.
+- Responsive product cards and product images.
+- URL-based filters and pagination.
+- Loading states, empty states and error handling.
+- Product details, prices and stock availability.
 
-## 2. Products Table
+**Shopping Cart Backend**
 
-### Purpose
+- Guest shopping carts without user accounts.
+- Persistent cart data stored in PostgreSQL.
+- Secure cart identification using HttpOnly cookies and hashed tokens.
+- GET, POST, PATCH and DELETE cart endpoints.
+- Quantity limits and stock availability validation.
+- Current prices, subtotals and cart totals calculated by the backend.
+- Support for removing or reducing unavailable items.
+- Seven-day cart expiration, renewed after successful modifications.
+- Origin validation, CORS protection and database transactions.
+- Automated unit, HTTP and PostgreSQL integration tests.
 
-The `products` table stores items available in the fictional Galaxy Shop.
+**Shopping Cart Frontend**
 
-Each row represents one product.
+- Add to Cart controls on product interfaces.
+- A dedicated `/cart` page.
+- Quantity controls and item removal.
+- Cart navigation and cart update notifications.
+- Loading, empty and error states.
+- Frontend API calls through a dedicated cart API module.
+- Browser-managed cookies for guest cart identification.
 
-### SQL Schema
+**Checkout and Orders**
 
-The current schema results from the implemented SQL migrations.
+- Checkout page at `/checkout`.
+- Customer email and shipping information form.
+- Server-side validation of customer details, product availability and stock.
+- PostgreSQL order and order item persistence.
+- Generated order numbers.
+- Transactional stock updates.
+- Cart items cleared after successful checkout while retaining the cart cookie.
+- Simulated payment status; no real payment provider or card collection.
+- Order confirmation screen.
+- Order confirmation email attempt through Resend.
 
-```sql
-CREATE TABLE products (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+**Testing and CI**
 
-    name TEXT NOT NULL
-        CHECK (length(trim(name)) > 0),
+- Automated frontend and backend tests.
+- PostgreSQL integration tests using a separate Neon testing branch.
+- GitHub Actions checks for build, tests and coverage.
 
-    description TEXT NOT NULL DEFAULT '',
+Real browser-to-backend integration and complete end-to-end shopping workflows must be verified separately before the complete shopping flow is considered tested.
 
-    price_pawstars INTEGER NOT NULL
-        CHECK (price_pawstars >= 0),
+### Planned
 
-    category TEXT NOT NULL
-        CHECK (length(trim(category)) > 0),
+- Complete browser-to-backend integration verification.
+- End-to-end tests for complete shopping workflows.
+- Authentication, if required for future features.
 
-    stock_quantity INTEGER NOT NULL DEFAULT 0
-        CHECK (stock_quantity >= 0),
+### Future Expansion
 
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+Hotel reservations and experience booking are outside the current scope and may be implemented as separate modules later.
 
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+Real payment processing is not implemented.
 
-    slug TEXT NOT NULL UNIQUE
-        CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
-
-    image_url TEXT
-);
-```
-
-This represents the resulting table structure. The actual migrations are stored separately and applied in order.
-
-### Columns
-
-| Column           | Type        | Nullable | Default  | Purpose                   |
-| ---------------- | ----------- | -------- | -------- | ------------------------- |
-| `id`             | BIGINT      | No       | Identity | Unique identifier         |
-| `name`           | TEXT        | No       | None     | Product name              |
-| `description`    | TEXT        | No       | `''`     | Product description       |
-| `price_pawstars` | INTEGER     | No       | None     | Price in Pawstars         |
-| `category`       | TEXT        | No       | None     | Product category          |
-| `stock_quantity` | INTEGER     | No       | 0        | Available units           |
-| `is_active`      | BOOLEAN     | No       | TRUE     | Product visibility        |
-| `created_at`     | TIMESTAMPTZ | No       | now()    | Creation timestamp        |
-| `slug`           | TEXT        | No       | None     | Unique URL-friendly name  |
-| `image_url`      | TEXT        | Yes      | NULL     | Product image URL or path |
-
-## Shopping Cart Tables
-
-Migration `004_create_carts.sql` introduces two tables.
-
-### carts
-
-Stores guest cart records.
-
-| Column       | Type        | Constraint / Default    |
-| ------------ | ----------- | ----------------------- |
-| `id`         | BIGINT      | Identity primary key    |
-| `token_hash` | CHAR(64)    | NOT NULL, UNIQUE        |
-| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-| `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-| `expires_at` | TIMESTAMPTZ | NOT NULL                |
-
-- The original access token is stored in an HttpOnly browser cookie.
-- PostgreSQL stores only its SHA-256 hash.
-- The backend checks whether the cart has expired.
-- PostgreSQL does not automatically delete expired records.
-
-### cart_items
-
-Stores individual products belonging to guest carts.
-
-| Column       | Type        | Constraint / Default    |
-| ------------ | ----------- | ----------------------- |
-| `id`         | BIGINT      | Identity primary key    |
-| `cart_id`    | BIGINT      | NOT NULL, foreign key   |
-| `product_id` | BIGINT      | NOT NULL, foreign key   |
-| `quantity`   | INTEGER     | NOT NULL, CHECK 1–20    |
-| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-| `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
-
-Database constraints:
-
-- `cart_id` references `carts(id)` with `ON DELETE CASCADE`.
-- `product_id` references `products(id)`.
-- `UNIQUE (cart_id, product_id)` prevents duplicate products in a cart.
-- `CHECK (quantity BETWEEN 1 AND 20)` enforces quantity limits.
-- Deleting a cart removes its items but does not delete products.
-
-### Cart Indexes
-
-`carts_expires_at_idx` indexes `carts(expires_at)` to support future cleanup of expired carts.
-
-Primary keys and unique constraints also provide indexes.
-
-The cart tables are covered by PostgreSQL integration tests.
-
-## 3. Constraints and Data Types
-
-### Primary Key
-
-```sql
-id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY
-```
-
-- Each product receives a unique ID.
-- PostgreSQL generates IDs automatically.
-- Duplicate primary keys are forbidden.
-- IDs are not guaranteed to be consecutive.
-
-### NOT NULL
-
-Prevents SQL NULL values.
-
-Example:
-
-```sql
-name TEXT NOT NULL
-```
-
-A product name cannot be NULL.
-
-However, `NOT NULL` alone does not reject empty strings such as `''`.
-
-The current database also uses CHECK constraints to reject empty or whitespace-only names and categories.
-
-Example:
-
-```sql
-CHECK (length(trim(name)) > 0)
-```
-
-### DEFAULT
-
-Supplies a value when a column is omitted from an INSERT.
-
-Example:
-
-```sql
-description TEXT NOT NULL DEFAULT ''
-```
-
-If description is omitted, PostgreSQL stores an empty string.
-
-An explicitly provided NULL is rejected.
-
-### CHECK
-
-Restricts the values a column may contain.
-
-Example:
-
-```sql
-price_pawstars INTEGER NOT NULL
-    CHECK (price_pawstars >= 0)
-```
-
-The price cannot be negative.
-
-For stock:
-
-```sql
-stock_quantity INTEGER NOT NULL DEFAULT 0
-    CHECK (stock_quantity >= 0)
-```
-
-Stock cannot become negative.
-
-For slugs:
-
-```sql
-CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
-```
-
-This restricts slugs to lowercase letters, digits and hyphens in the supported format.
-
-### UNIQUE
-
-Prevents duplicate values.
-
-Example:
-
-```sql
-slug TEXT NOT NULL UNIQUE
-```
-
-Two products cannot have the same slug.
-
-### Data Types
-
-`BIGINT`
-
-- Signed 64-bit integer.
-- Used for product IDs.
-
-`INTEGER`
-
-- Signed 32-bit integer.
-- Used for prices and stock quantities.
-
-`TEXT`
-
-- Variable-length text.
-- Used for names, descriptions, categories, slugs and image URLs.
-
-`BOOLEAN`
-
-- TRUE or FALSE.
-- Used for product visibility.
-
-`TIMESTAMPTZ`
-
-- Timestamp representing an absolute point in time.
-- Handles time-zone-aware input and output.
-- Used for product creation timestamps.
-
-## 4. Currency
-
-The fictional currency is Pawstars (PWS).
-
-Prices are stored as whole integers.
-
-Example:
-
-```sql
-price_pawstars = 3900
-```
-
-This represents 3900 Pawstars.
-
-There are no fractional units.
-
-No additional currency column is needed while the application uses only Pawstars.
-
-## 5. Indexes
-
-### Initial Index
-
-```sql
-CREATE INDEX products_active_category_idx
-ON products (is_active, category, id);
-```
-
-### Purpose
-
-This is an initial hypothesis for queries filtering active products by category.
-
-Example:
-
-```sql
-SELECT *
-FROM products
-WHERE is_active = TRUE
-  AND category = 'clothing'
-ORDER BY id ASC;
-```
-
-### Trade-offs
-
-- Indexes may improve read performance.
-- Indexes consume storage.
-- Inserts and updates may require index maintenance.
-- Not every query benefits from every index.
-- This index does not directly optimize all price or date sorting options.
-
-The usefulness of this index will be evaluated using actual queries and execution plans.
-
-### Performance Analysis
-
-Once enough sample data exists:
-
-```sql
-EXPLAIN ANALYZE
-SELECT *
-FROM products
-WHERE is_active = TRUE
-  AND category = 'clothing'
-ORDER BY id ASC;
-```
-
-Additional indexes will be considered only when justified by measured performance.
-
-## 6. Sample Data
-
-Initial sample products have been inserted using SQL.
-
-The seed file is:
-
-`backend/db/seeds/001_seed_products.sql`
-
-The current database contains 30 fictional products across eight categories.
-
-Example of a product insertion:
-
-```sql
-INSERT INTO products (
-    name,
-    description,
-    price_pawstars,
-    category,
-    stock_quantity,
-    slug
-)
-VALUES (
-    'Sphynx Sweater',
-    'Warm, because they are not.',
-    3900,
-    'clothing',
-    14,
-    'sphynx-sweater'
-);
-```
-
-This example illustrates the current required columns, including `slug`. The actual seed file contains the project's fictional product dataset.
-
-PostgreSQL automatically supplies:
-
-- `id`
-- `is_active`
-- `created_at`
-
-The optional `image_url` can be NULL.
-
-Additional products may be added during future development.
-
-## 7. Database Access
-
-The Express backend communicates with PostgreSQL using SQL.
-
-The project uses the Node.js `pg` library.
-
-No ORM is currently used.
-
-### Architecture
+## Project Structure
 
 ```text
-Next.js
-   |
-   | HTTP
-   v
-Express API
-   |
-   | Parameterized SQL
-   v
-PostgreSQL
+project-nebula/
+├── frontend/       Next.js frontend and tests
+├── backend/        Express API, SQL migrations and tests
+├── docs/           API, database and architecture documentation
+└── .github/        GitHub Actions workflows
 ```
 
-The Next.js frontend communicates with Express over HTTP. The frontend never accesses PostgreSQL directly; database access and business logic remain in the backend.
+The shopping cart and checkout backend separate HTTP routes from database operations. Repository modules handle database queries and transactions.
 
-### Security
+## Configuration
 
-- Database credentials remain on the backend.
-- The browser never receives database credentials.
-- User-provided values must be validated.
-- SQL queries use parameterized values.
-- Authorization must be enforced for protected data.
-- Database constraints protect data integrity.
+### Backend
 
-### BIGINT and TypeScript
+Create `backend/.env` and configure the PostgreSQL connection:
 
-PostgreSQL BIGINT values can exceed JavaScript's safe integer range.
+```dotenv
+DATABASE_URL=your_postgresql_connection_string
+RESEND_API_KEY=your_resend_api_key
+EMAIL_FROM=your_verified_sender
+```
 
-The backend must handle BIGINT identifiers without precision loss.
+The Resend variables are used for the order confirmation email attempt.
 
-The `pg` library returns BIGINT values as strings by default.
+The API runs at `http://localhost:4000` by default.
 
-The current product API returns ID values as JSON strings and validates product IDs using `BigInt`.
+### Frontend
 
-### Transactions
+The frontend uses `NEXT_PUBLIC_API_URL` to determine the base URL of the backend API.
 
-Transactions are used by shopping cart write operations to preserve data integrity and handle concurrent modifications safely. Integration tests also use transactions to isolate changes and roll them back.
+If the variable is not set, the frontend defaults to:
 
-Transactions will be especially important for:
+```dotenv
+http://localhost:4000
+```
 
-- Order creation
-- Stock updates
-- Simulated checkout
+For local development, this fallback can be used without additional configuration. To configure a different backend URL, create `frontend/.env.local` and add:
 
-## 8. Database Migrations
+```dotenv
+NEXT_PUBLIC_API_URL=http://localhost:4000
+```
 
-Schema changes are tracked in versioned SQL files.
+Replace the URL with the address of the backend environment you want to use. Restart the Next.js development server after changing environment variables.
 
-Directory:
+`NEXT_PUBLIC_API_URL` is exposed to the browser and must contain only a public API base URL, never secrets or credentials.
 
-`backend/db/migrations/`
+## Running the Backend
 
-### Migration 001
+From the `backend` directory, install dependencies:
 
-`001_create_products.sql`
+```powershell
+npm.cmd install
+```
 
-This migration creates:
+Create `backend/.env` with the required `DATABASE_URL`, then start the backend:
 
-- The `products` table
-- Initial columns
-- CHECK constraints
-- The `products_active_category_idx` index
+```powershell
+npm.cmd run dev
+```
 
-### Migration 002
+### Available API Endpoints
 
-`002_add_product_slug_and_image.sql`
+| Method | Endpoint                     | Purpose                                  |
+| ------ | ---------------------------- | ---------------------------------------- |
+| GET    | `/api/health`                | Health check                             |
+| GET    | `/api/products`              | List, filter, sort and paginate products |
+| GET    | `/api/products/:id`          | Retrieve product details                 |
+| GET    | `/api/cart`                  | Retrieve the guest cart                  |
+| POST   | `/api/cart/items`            | Add a product to the cart                |
+| PATCH  | `/api/cart/items/:productId` | Replace an item's quantity               |
+| DELETE | `/api/cart/items/:productId` | Remove an item                           |
+| POST   | `/api/cart/checkout`         | Create an order from the guest cart      |
 
-This migration adds:
+Example product request:
 
-- `slug`: required, unique and validated
-- `image_url`: optional image URL or path
+```text
+GET /api/products?category=clothing&sort=price_asc&page=1&limit=20
+```
 
-Future migrations must account for existing records when adding required columns or modifying constraints.
+Example cart addition:
 
-### Migration 003
+```http
+POST /api/cart/items
+Content-Type: application/json
+Origin: http://localhost:3000
+```
 
-`003_update_product_catalog.sql`
+```json
+{
+  "product_id": "1",
+  "quantity": 2
+}
+```
 
-This migration updates product catalog content, including descriptions and image paths.
+The cart uses a browser cookie to identify the guest. POST, PATCH, DELETE and checkout require requests from the trusted frontend origin.
 
-### Migration 004
+## Running the Frontend
 
-`004_create_carts.sql`
+From the `frontend` directory, install dependencies:
 
-This migration creates:
+```powershell
+npm.cmd install
+```
 
-- The `carts` table.
-- The `cart_items` table.
-- Cart token uniqueness.
-- Quantity and foreign key constraints.
-- Cascading deletion of cart items.
-- The index on cart expiration.
+Start the Next.js development server:
 
-Migration 004 has been applied to both the normal development database and the dedicated Neon testing database.
+```powershell
+npm.cmd run dev
+```
 
-Its constraints are verified by automated PostgreSQL integration tests.
+The frontend runs at `http://localhost:3000`.
 
-### Documentation vs Migrations
+Useful routes:
 
-`database-design.md`:
+- `/products` — product catalog.
+- `/products/:id` — product details.
+- `/cart` — shopping cart.
+- `/checkout` — checkout and simulated payment.
 
-- Describes the intended and implemented schema.
-- Explains data types and constraints.
-- Documents design decisions.
-- Discusses indexes and trade-offs.
+The Express backend must be running for the frontend to retrieve product data and use the shopping cart and checkout APIs.
 
-Migration files:
+## Testing
 
-- Contain executable SQL.
-- Apply schema changes to PostgreSQL.
-- Track database structure over time.
+### Frontend
 
-The project currently uses SQL migration files. An automated migration management system has not yet been introduced.
+From the `frontend` directory:
 
-### Database Branches
+```powershell
+npx.cmd vitest run
+```
 
-Neon is used with separate database branches.
+Run the tests with coverage:
 
-- `production`: main application database branch.
-- `testing`: dedicated branch for PostgreSQL integration tests.
+```powershell
+npx.cmd vitest run --coverage
+```
 
-The backend reads its normal database connection from `DATABASE_URL`.
+### Backend
 
-Integration tests use `TEST_DATABASE_URL` to connect to the separate testing branch.
+Run the backend test scripts from the `backend` directory using the scripts defined in its `package.json`. PostgreSQL integration tests require the configured test database.
 
-Integration tests must not accidentally modify production data.
+GitHub Actions runs automated frontend and backend checks.
 
-## 9. Open Decisions
+## Documentation
 
-| Decision                            | Status                                                 |
-| ----------------------------------- | ------------------------------------------------------ |
-| BIGINT or INTEGER IDs               | BIGINT implemented                                     |
-| Empty name and category constraints | Implemented                                            |
-| Product categories                  | Defined                                                |
-| Product images                      | `image_url` implemented; storage strategy remains open |
-| Stock display                       | Implemented in product interfaces                      |
-| Additional indexes                  | Evaluate after performance analysis                    |
-| User and cart tables                | Cart tables implemented; user table deferred           |
-| Order and order item tables         | Before orders                                          |
-| Stock reservation strategy          | Before checkout                                        |
-| Payment records                     | Before simulated checkout                              |
+- [API Design](docs/api-design.md) — API endpoints, request and response behavior.
+- [Database Design](docs/database-design.md) — PostgreSQL tables, constraints and migrations.
+- [Backend Architecture](docs/backend-architecture.md) — backend modules and request flow.
+- [Shopping Cart Design](docs/shopping-cart-design.md) — guest cart API and business rules.
+- [Shopping Cart Frontend Design](docs/shopping-cart-frontend-design.md) — cart and checkout interfaces.
+- [Payment Flow](docs/payment-flow.md) — checkout, order creation and simulated payment.
+- [Frontend Catalog Design](docs/frontend-catalog-design.md) — catalog UI and filtering.
+- [Product Detail Design](docs/product-detail-design.md) — product detail pages.
 
-The initial decisions about BIGINT IDs, empty name/category constraints and product categories have been implemented.
+## Project Status
 
-The database now includes `image_url`, but actual image storage and hosting remain to be decided.
+The product catalog, product detail pages, guest shopping cart and checkout flow are implemented.
 
-## 10. Future Database Expansion
+The checkout creates persistent orders and order item snapshots, validates and decrements stock within a database transaction, and records a simulated payment status. The cart cookie is retained after checkout while its items are cleared.
 
-The cart tables (`carts` and `cart_items`) are already implemented.
-
-Future e-commerce tables may include:
-
-- `users`, if customer accounts are introduced
-- `orders`
-- `order_items`
-- `payments`
-
-Hotel and experience functionality will require additional tables and relationships.
-
-Their database structures have not yet been designed.
-
-Foreign keys, transactions and business constraints will be defined as the corresponding features are implemented.
-
----
-
-**Document status:** Product and guest cart database schemas implemented.
-
-Migrations 001–004 are present. The cart backend API is implemented; browser-to-backend and full end-to-end verification remain separate tasks.
+No real payment provider is connected and no card details are collected. Browser-to-backend integration and complete end-to-end shopping workflow verification remain to be completed.

@@ -56,6 +56,19 @@ The frontend communicates with the Express API through HTTP. Database access and
 - Frontend API calls through a dedicated cart API module.
 - Browser-managed cookies for guest cart identification.
 
+**Checkout and Orders**
+
+- Checkout page at `/checkout`.
+- Customer email and shipping information form.
+- Server-side validation of customer details, product availability and stock.
+- PostgreSQL order and order item persistence.
+- Generated order numbers.
+- Transactional stock updates.
+- Cart items cleared after successful checkout while retaining the cart cookie.
+- Simulated payment status; no real payment provider or card collection.
+- Order confirmation screen.
+- Order confirmation email attempt through Resend.
+
 **Testing and CI**
 
 - Automated frontend and backend tests.
@@ -68,13 +81,13 @@ Real browser-to-backend integration and complete end-to-end shopping workflows m
 
 - Complete browser-to-backend integration verification.
 - End-to-end tests for complete shopping workflows.
-- Orders and inventory management during checkout.
-- Simulated checkout and payments.
 - Authentication, if required for future features.
 
 ### Future Expansion
 
 Hotel reservations and experience booking are outside the current scope and may be implemented as separate modules later.
+
+Real payment processing is not implemented.
 
 ## Project Structure
 
@@ -86,7 +99,7 @@ project-nebula/
 └── .github/        GitHub Actions workflows
 ```
 
-The shopping cart backend separates HTTP routes from database operations. Repository modules handle reading cart data and modifying it through PostgreSQL transactions.
+The shopping cart and checkout backend separate HTTP routes from database operations. Repository modules handle database queries and transactions.
 
 ## Configuration
 
@@ -96,7 +109,11 @@ Create `backend/.env` and configure the PostgreSQL connection:
 
 ```dotenv
 DATABASE_URL=your_postgresql_connection_string
+RESEND_API_KEY=your_resend_api_key
+EMAIL_FROM=your_verified_sender
 ```
+
+The Resend variables are used for the order confirmation email attempt.
 
 The API runs at `http://localhost:4000` by default.
 
@@ -145,6 +162,7 @@ npm.cmd run dev
 | POST   | `/api/cart/items`            | Add a product to the cart                |
 | PATCH  | `/api/cart/items/:productId` | Replace an item's quantity               |
 | DELETE | `/api/cart/items/:productId` | Remove an item                           |
+| POST   | `/api/cart/checkout`         | Create an order from the guest cart      |
 
 Example product request:
 
@@ -167,7 +185,7 @@ Origin: http://localhost:3000
 }
 ```
 
-The cart uses a browser cookie to identify the guest. POST, PATCH and DELETE require requests from the trusted frontend origin.
+The cart uses a browser cookie to identify the guest. POST, PATCH, DELETE and checkout require requests from the trusted frontend origin.
 
 ## Running the Frontend
 
@@ -190,14 +208,15 @@ Useful routes:
 - `/products` — product catalog.
 - `/products/:id` — product details.
 - `/cart` — shopping cart.
+- `/checkout` — checkout and simulated payment.
 
-The Express backend must be running for the frontend to retrieve product data and use the shopping cart API.
+The Express backend must be running for the frontend to retrieve product data and use the shopping cart and checkout APIs.
 
 ## Testing
 
 ### Frontend
 
-From the `frontend` directory, run the tests:
+From the `frontend` directory:
 
 ```powershell
 npx.cmd vitest run
@@ -217,11 +236,19 @@ GitHub Actions runs automated frontend and backend checks.
 
 ## Documentation
 
-- [Shopping Cart Frontend Design](docs/shopping-cart-frontend-design.md) — Cart interface, API usage, state handling and frontend tests.
-- [Frontend Catalog Design](docs/frontend-catalog-design.md) — Catalog UI and filtering.
+- [API Design](docs/api-design.md) — API endpoints, request and response behavior.
+- [Database Design](docs/database-design.md) — PostgreSQL tables, constraints and migrations.
+- [Backend Architecture](docs/backend-architecture.md) — backend modules and request flow.
+- [Shopping Cart Design](docs/shopping-cart-design.md) — guest cart API and business rules.
+- [Shopping Cart Frontend Design](docs/shopping-cart-frontend-design.md) — cart and checkout interfaces.
+- [Payment Flow](docs/payment-flow.md) — checkout, order creation and simulated payment.
+- [Frontend Catalog Design](docs/frontend-catalog-design.md) — catalog UI and filtering.
+- [Product Detail Design](docs/product-detail-design.md) — product detail pages.
 
 ## Project Status
 
-The product catalog and product detail frontend and backend are implemented. The shopping cart backend supports all four REST operations: GET, POST, PATCH and DELETE. The frontend includes Add to Cart controls, a dedicated cart page, quantity controls, item removal and cart navigation.
+The product catalog, product detail pages, guest shopping cart and checkout flow are implemented.
 
-Checkout, orders and payment processing are not implemented. All purchases and payments remain simulated; no real payment provider is connected.
+The checkout creates persistent orders and order item snapshots, validates and decrements stock within a database transaction, and records a simulated payment status. The cart cookie is retained after checkout while its items are cleared.
+
+No real payment provider is connected and no card details are collected. Browser-to-backend integration and complete end-to-end shopping workflow verification remain to be completed.
