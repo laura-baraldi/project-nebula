@@ -4,9 +4,21 @@ import {
   checkout,
   CheckoutApiError,
   type CheckoutOrder,
+  type ShippingDetails,
 } from "../lib/checkoutApi";
 
 const mockFetch = vi.fn();
+
+const mockShipping: ShippingDetails = {
+  first_name: "Laura",
+  last_name: "Baraldi",
+  address_line1: "Via Roma 10",
+  address_line2: "Apartment 2",
+  city: "Milano",
+  postal_code: "20100",
+  country: "Italy",
+  phone: "+393331234567",
+};
 
 const mockOrder: CheckoutOrder = {
   order_number: "ORD-123",
@@ -46,15 +58,15 @@ describe("Checkout API client", () => {
   it("POST creates an order and returns it", async () => {
     mockSuccess();
 
-    const order = await checkout("test@example.com");
+    const order = await checkout("test@example.com", mockShipping);
 
     expect(order).toEqual(mockOrder);
   });
 
-  it("POST sends the customer email and includes credentials", async () => {
+  it("POST sends customer email and shipping details with credentials", async () => {
     mockSuccess();
 
-    await checkout("test@example.com");
+    await checkout("test@example.com", mockShipping);
 
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringMatching(/\/api\/cart\/checkout$/),
@@ -67,6 +79,7 @@ describe("Checkout API client", () => {
         },
         body: JSON.stringify({
           customer_email: "test@example.com",
+          ...mockShipping,
         }),
       }),
     );
@@ -88,7 +101,9 @@ describe("Checkout API client", () => {
       ),
     );
 
-    await expect(checkout("test@example.com")).rejects.toMatchObject({
+    await expect(
+      checkout("test@example.com", mockShipping),
+    ).rejects.toMatchObject({
       name: "CheckoutApiError",
       status: 409,
       code: "INSUFFICIENT_STOCK",
@@ -103,7 +118,9 @@ describe("Checkout API client", () => {
       }),
     );
 
-    await expect(checkout("test@example.com")).rejects.toMatchObject({
+    await expect(
+      checkout("test@example.com", mockShipping),
+    ).rejects.toMatchObject({
       name: "CheckoutApiError",
       status: 500,
       code: "UNKNOWN_ERROR",
@@ -119,7 +136,9 @@ describe("Checkout API client", () => {
       }),
     );
 
-    await expect(checkout("test@example.com")).rejects.toMatchObject({
+    await expect(
+      checkout("test@example.com", mockShipping),
+    ).rejects.toMatchObject({
       name: "CheckoutApiError",
       status: 500,
       code: "UNKNOWN_ERROR",
