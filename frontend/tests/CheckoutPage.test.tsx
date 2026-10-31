@@ -68,6 +68,28 @@ const mockOrder: CheckoutOrder = {
   ],
 };
 
+async function fillShippingDetails(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText("Email address *"), "test@example.com");
+  await user.type(screen.getByLabelText("First name *"), "Alex");
+  await user.type(screen.getByLabelText("Last name *"), "Smith");
+  await user.type(screen.getByLabelText("Address *"), "123 Demo Street");
+  await user.type(screen.getByLabelText("City *"), "Stockholm");
+  await user.type(screen.getByLabelText("Postal code *"), "12345");
+  await user.type(screen.getByLabelText("Country *"), "Sweden");
+}
+
+async function continueToPayment(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "Continue to payment" }));
+
+  expect(
+    await screen.findByRole("heading", { name: "Payment method" }),
+  ).toBeInTheDocument();
+}
+
+async function completePayment(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: "Pay now" }));
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
 });
@@ -92,8 +114,9 @@ describe("CheckoutPage", () => {
 
     expect(screen.getByText("Comet Stroller × 2")).toBeInTheDocument();
     expect(screen.getAllByText("15800 PWS")).toHaveLength(2);
+
     expect(
-      screen.getByRole("button", { name: "Place order" }),
+      screen.getByRole("button", { name: "Continue to payment" }),
     ).toBeInTheDocument();
   });
 
@@ -126,11 +149,53 @@ describe("CheckoutPage", () => {
     ).toHaveAttribute("href", "/products");
 
     expect(
-      screen.queryByRole("button", { name: "Place order" }),
+      screen.queryByRole("button", { name: "Continue to payment" }),
     ).not.toBeInTheDocument();
   });
 
-  it("submits the email and shipping details", async () => {
+  it("continues to payment without creating an order", async () => {
+    const user = userEvent.setup();
+
+    mockedGetCart.mockResolvedValue(filledCart);
+
+    render(<CheckoutPage />);
+
+    await screen.findByRole("heading", { name: "Checkout" });
+    await fillShippingDetails(user);
+    await continueToPayment(user);
+
+    expect(screen.getByText("•••• •••• •••• 4242")).toBeInTheDocument();
+    expect(screen.getByText("DEMO CUSTOMER")).toBeInTheDocument();
+    expect(screen.getByText("12/30")).toBeInTheDocument();
+
+    expect(mockedCheckout).not.toHaveBeenCalled();
+  });
+
+  it("returns to shipping and preserves the entered details", async () => {
+    const user = userEvent.setup();
+
+    mockedGetCart.mockResolvedValue(filledCart);
+
+    render(<CheckoutPage />);
+
+    await screen.findByRole("heading", { name: "Checkout" });
+    await fillShippingDetails(user);
+    await continueToPayment(user);
+
+    await user.click(screen.getByRole("button", { name: "Back to shipping" }));
+
+    expect(
+      await screen.findByRole("button", { name: "Continue to payment" }),
+    ).toBeInTheDocument();
+
+    expect(screen.getByLabelText("Email address *")).toHaveValue(
+      "test@example.com",
+    );
+    expect(screen.getByLabelText("First name *")).toHaveValue("Alex");
+    expect(screen.getByLabelText("Last name *")).toHaveValue("Smith");
+  });
+
+  it("submits the email and shipping details when Pay now is clicked", async () => {
     const user = userEvent.setup();
 
     mockedGetCart.mockResolvedValue(filledCart);
@@ -139,19 +204,12 @@ describe("CheckoutPage", () => {
     render(<CheckoutPage />);
 
     await screen.findByRole("heading", { name: "Checkout" });
+    await fillShippingDetails(user);
+    await continueToPayment(user);
 
-    await user.type(
-      screen.getByLabelText("Email address *"),
-      "test@example.com",
-    );
-    await user.type(screen.getByLabelText("First name *"), "Alex");
-    await user.type(screen.getByLabelText("Last name *"), "Smith");
-    await user.type(screen.getByLabelText("Address *"), "123 Demo Street");
-    await user.type(screen.getByLabelText("City *"), "Stockholm");
-    await user.type(screen.getByLabelText("Postal code *"), "12345");
-    await user.type(screen.getByLabelText("Country *"), "Sweden");
+    expect(mockedCheckout).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "Place order" }));
+    await completePayment(user);
 
     await waitFor(() => {
       expect(mockedCheckout).toHaveBeenCalledWith("test@example.com", {
@@ -176,19 +234,9 @@ describe("CheckoutPage", () => {
     render(<CheckoutPage />);
 
     await screen.findByRole("heading", { name: "Checkout" });
-
-    await user.type(
-      screen.getByLabelText("Email address *"),
-      "test@example.com",
-    );
-    await user.type(screen.getByLabelText("First name *"), "Alex");
-    await user.type(screen.getByLabelText("Last name *"), "Smith");
-    await user.type(screen.getByLabelText("Address *"), "123 Demo Street");
-    await user.type(screen.getByLabelText("City *"), "Stockholm");
-    await user.type(screen.getByLabelText("Postal code *"), "12345");
-    await user.type(screen.getByLabelText("Country *"), "Sweden");
-
-    await user.click(screen.getByRole("button", { name: "Place order" }));
+    await fillShippingDetails(user);
+    await continueToPayment(user);
+    await completePayment(user);
 
     expect(
       await screen.findByRole("heading", { name: "Order confirmed!" }),
@@ -215,19 +263,9 @@ describe("CheckoutPage", () => {
     render(<CheckoutPage />);
 
     await screen.findByRole("heading", { name: "Checkout" });
-
-    await user.type(
-      screen.getByLabelText("Email address *"),
-      "test@example.com",
-    );
-    await user.type(screen.getByLabelText("First name *"), "Alex");
-    await user.type(screen.getByLabelText("Last name *"), "Smith");
-    await user.type(screen.getByLabelText("Address *"), "123 Demo Street");
-    await user.type(screen.getByLabelText("City *"), "Stockholm");
-    await user.type(screen.getByLabelText("Postal code *"), "12345");
-    await user.type(screen.getByLabelText("Country *"), "Sweden");
-
-    await user.click(screen.getByRole("button", { name: "Place order" }));
+    await fillShippingDetails(user);
+    await continueToPayment(user);
+    await completePayment(user);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Not enough stock available.",
@@ -249,26 +287,16 @@ describe("CheckoutPage", () => {
     render(<CheckoutPage />);
 
     await screen.findByRole("heading", { name: "Checkout" });
-
-    await user.type(
-      screen.getByLabelText("Email address *"),
-      "test@example.com",
-    );
-    await user.type(screen.getByLabelText("First name *"), "Alex");
-    await user.type(screen.getByLabelText("Last name *"), "Smith");
-    await user.type(screen.getByLabelText("Address *"), "123 Demo Street");
-    await user.type(screen.getByLabelText("City *"), "Stockholm");
-    await user.type(screen.getByLabelText("Postal code *"), "12345");
-    await user.type(screen.getByLabelText("Country *"), "Sweden");
-
-    await user.click(screen.getByRole("button", { name: "Place order" }));
+    await fillShippingDetails(user);
+    await continueToPayment(user);
+    await completePayment(user);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Something went wrong. Please try again.",
     );
   });
 
-  it("disables the submit button and ignores a second submission while checkout is pending", async () => {
+  it("disables Pay now while checkout is pending and calls checkout only once", async () => {
     const user = userEvent.setup();
 
     mockedGetCart.mockResolvedValue(filledCart);
@@ -277,33 +305,21 @@ describe("CheckoutPage", () => {
     render(<CheckoutPage />);
 
     await screen.findByRole("heading", { name: "Checkout" });
+    await fillShippingDetails(user);
+    await continueToPayment(user);
 
-    await user.type(
-      screen.getByLabelText("Email address *"),
-      "demo@example.com",
-    );
-    await user.type(screen.getByLabelText("First name *"), "Alex");
-    await user.type(screen.getByLabelText("Last name *"), "Smith");
-    await user.type(screen.getByLabelText("Address *"), "123 Demo Street");
-    await user.type(screen.getByLabelText("City *"), "Stockholm");
-    await user.type(screen.getByLabelText("Postal code *"), "12345");
-    await user.type(screen.getByLabelText("Country *"), "Sweden");
+    await user.click(screen.getByRole("button", { name: "Pay now" }));
 
-    const form = screen
-      .getByRole("button", { name: "Place order" })
-      .closest("form");
+    const processingButton = await screen.findByRole("button", {
+      name: "Processing...",
+    });
 
-    expect(form).not.toBeNull();
+    expect(processingButton).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "Place order" }));
-
-    expect(
-      await screen.findByRole("button", { name: "Creating order..." }),
-    ).toBeDisabled();
-
-    fireEvent.submit(form!);
+    await user.click(processingButton);
 
     expect(mockedCheckout).toHaveBeenCalledTimes(1);
+    expect(mockedNotifyCartUpdated).not.toHaveBeenCalled();
   });
 
   it("shows the fallback message when the cart is null without an error", async () => {
@@ -313,6 +329,83 @@ describe("CheckoutPage", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Could not load your cart.",
+    );
+  });
+
+  it("does not continue if the cart becomes empty before submission", async () => {
+    let cartIsEmpty = false;
+
+    const items = new Proxy([...filledCart.items], {
+      get(target, property, receiver) {
+        if (property === "length" && cartIsEmpty) return 0;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    mockedGetCart.mockResolvedValue({ ...filledCart, items } as Cart);
+
+    render(<CheckoutPage />);
+    await screen.findByRole("heading", { name: "Checkout" });
+
+    cartIsEmpty = true;
+
+    fireEvent.submit(
+      screen
+        .getByRole("button", { name: "Continue to payment" })
+        .closest("form")!,
+    );
+
+    expect(
+      screen.queryByRole("heading", { name: "Payment method" }),
+    ).not.toBeInTheDocument();
+    expect(mockedCheckout).not.toHaveBeenCalled();
+  });
+
+  it("does not call checkout if the cart becomes empty before paying", async () => {
+    const user = userEvent.setup();
+    let cartIsEmpty = false;
+
+    const items = new Proxy([...filledCart.items], {
+      get(target, property, receiver) {
+        if (property === "length" && cartIsEmpty) return 0;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    mockedGetCart.mockResolvedValue({ ...filledCart, items } as Cart);
+
+    render(<CheckoutPage />);
+
+    await screen.findByRole("heading", { name: "Checkout" });
+    await fillShippingDetails(user);
+    await continueToPayment(user);
+
+    cartIsEmpty = true;
+
+    await completePayment(user);
+
+    expect(mockedCheckout).not.toHaveBeenCalled();
+    expect(mockedNotifyCartUpdated).not.toHaveBeenCalled();
+  });
+
+  it("shows the shipping error message when error is set", async () => {
+    const unusualResponse = {
+      then(onFulfilled: (cart: Cart) => void) {
+        onFulfilled(filledCart);
+        return Promise.reject(new Error("Network error"));
+      },
+    };
+
+    mockedGetCart.mockReturnValue(unusualResponse as unknown as Promise<Cart>);
+
+    render(<CheckoutPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Checkout" }),
+    ).toBeInTheDocument();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not load your cart. Please try again.",
     );
   });
 });
