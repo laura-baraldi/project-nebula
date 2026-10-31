@@ -4,15 +4,16 @@ import { readCartToken, setCartCookie } from "../cart-cookie.js";
 import { hashCartToken } from "../cart-token.js";
 import { cartSecurity } from "../cart-security.js";
 import { CartBusinessError } from "../db/cart.repository.js";
-import { checkout } from "../db/checkout/checkout.repository.js";
+import {
+  checkout,
+  type ShippingDetails,
+} from "../db/checkout/checkout.repository.js";
 import { sendOrderConfirmationEmail } from "../email/email.service.js";
 
 export const checkoutRouter = Router();
 
-// Apply the same Origin protection used by cart modifications.
 checkoutRouter.use(cartSecurity);
 
-// POST /api/cart/checkout
 checkoutRouter.post("/", async (req, res) => {
   try {
     if (!req.is("application/json")) {
@@ -27,23 +28,54 @@ checkoutRouter.post("/", async (req, res) => {
 
     const body = req.body;
 
-    // Accept exactly one field: customer_email.
+    // Accept only the supported customer and shipping fields.
+    const requiredFields = [
+      "customer_email",
+      "first_name",
+      "last_name",
+      "address_line1",
+      "city",
+      "postal_code",
+      "country",
+    ];
+
+    const allowedFields = [...requiredFields, "address_line2", "phone"];
+
     if (
       body === null ||
       typeof body !== "object" ||
       Array.isArray(body) ||
-      Object.keys(body).length !== 1 ||
-      !Object.hasOwn(body, "customer_email") ||
-      typeof body.customer_email !== "string"
+      Object.keys(body).some((key) => !allowedFields.includes(key)) ||
+      requiredFields.some(
+        (field) =>
+          !Object.hasOwn(body, field) ||
+          typeof body[field] !== "string" ||
+          body[field].trim().length === 0,
+      ) ||
+      ["address_line2", "phone"].some(
+        (field) =>
+          Object.hasOwn(body, field) && typeof body[field] !== "string",
+      )
     ) {
       res.status(400).json({
         error: {
           code: "VALIDATION_ERROR",
-          message: "Provide a valid customer_email.",
+          message: "Provide valid customer and shipping details.",
         },
       });
       return;
     }
+
+    const shipping: ShippingDetails = {
+      first_name: body.first_name.trim(),
+      last_name: body.last_name.trim(),
+      address_line1: body.address_line1.trim(),
+      address_line2: body.address_line2?.trim() || undefined,
+      city: body.city.trim(),
+      postal_code: body.postal_code.trim(),
+      country: body.country.trim(),
+      phone: body.phone?.trim() || undefined,
+    };
 
     const token = readCartToken(req);
 
@@ -59,18 +91,21 @@ checkoutRouter.post("/", async (req, res) => {
 
     const tokenHash = hashCartToken(token);
 
-    // The repository validates the email and performs the transaction.
-    const order = await checkout(tokenHash, body.customer_email);
+    const order = await checkout(
+      tokenHash,
+      body.customer_email.trim(),
+      shipping,
+    );
 
-    // Send the confirmation email after the order has been created.
-    // Email failures must not undo a successful checkout.
     try {
-      await sendOrderConfirmationEmail(body.customer_email, order.order_number);
+      await sendOrderConfirmationEmail(
+        body.customer_email.trim(),
+        order.order_number,
+      );
     } catch (emailError) {
       console.error("Failed to send order confirmation email:", emailError);
     }
 
-    // Keep the same cart token and renew its seven-day cookie.
     setCartCookie(res, token);
 
     res.status(201).json({

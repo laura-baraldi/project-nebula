@@ -17,6 +17,17 @@ export interface CheckoutResult {
   }[];
 }
 
+export interface ShippingDetails {
+  first_name: string;
+  last_name: string;
+  address_line1: string;
+  address_line2?: string;
+  city: string;
+  postal_code: string;
+  country: string;
+  phone?: string;
+}
+
 interface CheckoutCartItem {
   product_id: string;
   name: string;
@@ -29,6 +40,7 @@ interface CheckoutCartItem {
 export async function checkout(
   tokenHash: string,
   customerEmail: string,
+  shipping: ShippingDetails,
 ): Promise<CheckoutResult> {
   const email = customerEmail.trim();
 
@@ -119,15 +131,37 @@ export async function checkout(
 
     // Create a new, independent order.
     const orderResult = await client.query<CheckoutResult>(
-      `INSERT INTO orders (customer_email, total_pawstars)
-       VALUES ($1, $2)
-       RETURNING
-  order_number,
-  customer_email,
-  total_pawstars,
-  payment_status,
-  created_at`,
-      [email, total],
+      `INSERT INTO orders (
+     customer_email,
+     first_name,
+     last_name,
+     address_line1,
+     address_line2,
+     city,
+     postal_code,
+     country,
+     phone,
+     total_pawstars
+   )
+   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+   RETURNING
+     order_number,
+     customer_email,
+     total_pawstars,
+     payment_status,
+     created_at`,
+      [
+        email,
+        shipping.first_name,
+        shipping.last_name,
+        shipping.address_line1,
+        shipping.address_line2 ?? null,
+        shipping.city,
+        shipping.postal_code,
+        shipping.country,
+        shipping.phone ?? null,
+        total,
+      ],
     );
 
     const order = orderResult.rows[0];

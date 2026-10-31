@@ -53,6 +53,16 @@ const mockSendEmail = vi.mocked(sendOrderConfirmationEmail);
 const ORIGIN = "http://localhost:3000";
 const TOKEN = generateCartToken();
 
+const VALID_CHECKOUT_BODY = {
+  customer_email: "test@example.com",
+  first_name: "Laura",
+  last_name: "Baraldi",
+  address_line1: "Via Roma 1",
+  city: "Milano",
+  postal_code: "20100",
+  country: "Italy",
+};
+
 const ORDER = {
   order_number: "ORD-123",
   customer_email: "test@example.com",
@@ -70,7 +80,7 @@ const ORDER = {
 };
 
 function checkoutRequest(
-  body: unknown = { customer_email: "test@example.com" },
+  body: unknown = VALID_CHECKOUT_BODY,
   token: string | null = TOKEN,
 ) {
   const req = request(app)
@@ -107,7 +117,75 @@ describe("POST /api/cart/checkout", () => {
     expect(mockCheckout).toHaveBeenCalledWith(
       hashCartToken(TOKEN),
       "test@example.com",
+      {
+        first_name: "Laura",
+        last_name: "Baraldi",
+        address_line1: "Via Roma 1",
+        address_line2: undefined,
+        city: "Milano",
+        postal_code: "20100",
+        country: "Italy",
+        phone: undefined,
+      },
     );
+  });
+
+  it("passes optional shipping fields to the checkout repository", async () => {
+    const response = await checkoutRequest({
+      ...VALID_CHECKOUT_BODY,
+      address_line2: "Apartment 2",
+      phone: "+39 123456789",
+    });
+
+    expect(response.status).toBe(201);
+
+    expect(mockCheckout).toHaveBeenCalledWith(
+      hashCartToken(TOKEN),
+      "test@example.com",
+      {
+        first_name: "Laura",
+        last_name: "Baraldi",
+        address_line1: "Via Roma 1",
+        address_line2: "Apartment 2",
+        city: "Milano",
+        postal_code: "20100",
+        country: "Italy",
+        phone: "+39 123456789",
+      },
+    );
+  });
+
+  it("trims whitespace from customer and shipping fields", async () => {
+    const response = await checkoutRequest({
+      customer_email: "  test@example.com  ",
+      first_name: "  Laura  ",
+      last_name: "  Baraldi  ",
+      address_line1: "  Via Roma 1  ",
+      address_line2: "  Apartment 2  ",
+      city: "  Milano  ",
+      postal_code: "  20100  ",
+      country: "  Italy  ",
+      phone: "  +39 123456789  ",
+    });
+
+    expect(response.status).toBe(201);
+
+    expect(mockCheckout).toHaveBeenCalledWith(
+      hashCartToken(TOKEN),
+      "test@example.com",
+      {
+        first_name: "Laura",
+        last_name: "Baraldi",
+        address_line1: "Via Roma 1",
+        address_line2: "Apartment 2",
+        city: "Milano",
+        postal_code: "20100",
+        country: "Italy",
+        phone: "+39 123456789",
+      },
+    );
+
+    expect(mockSendEmail).toHaveBeenCalledWith("test@example.com", "ORD-123");
   });
 
   it("renews the original HttpOnly cart cookie after success", async () => {
@@ -132,7 +210,7 @@ describe("POST /api/cart/checkout", () => {
     const response = await request(app)
       .post("/api/cart/checkout")
       .set("Origin", "https://malicious.example")
-      .send({ customer_email: "test@example.com" });
+      .send(VALID_CHECKOUT_BODY);
 
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("FORBIDDEN_ORIGIN");
@@ -142,7 +220,7 @@ describe("POST /api/cart/checkout", () => {
   it("rejects requests without an Origin", async () => {
     const response = await request(app)
       .post("/api/cart/checkout")
-      .send({ customer_email: "test@example.com" });
+      .send(VALID_CHECKOUT_BODY);
 
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("FORBIDDEN_ORIGIN");
@@ -164,9 +242,26 @@ describe("POST /api/cart/checkout", () => {
   it.each([
     [],
     {},
-    { customer_email: 123 },
-    { customer_email: null },
-    { customer_email: "test@example.com", total: 200 },
+    { ...VALID_CHECKOUT_BODY, customer_email: 123 },
+    { ...VALID_CHECKOUT_BODY, customer_email: null },
+    { ...VALID_CHECKOUT_BODY, customer_email: "" },
+    { ...VALID_CHECKOUT_BODY, first_name: undefined },
+    { ...VALID_CHECKOUT_BODY, first_name: "" },
+    { ...VALID_CHECKOUT_BODY, first_name: "   " },
+    { ...VALID_CHECKOUT_BODY, last_name: undefined },
+    { ...VALID_CHECKOUT_BODY, last_name: "" },
+    { ...VALID_CHECKOUT_BODY, address_line1: undefined },
+    { ...VALID_CHECKOUT_BODY, address_line1: "" },
+    { ...VALID_CHECKOUT_BODY, address_line1: "   " },
+    { ...VALID_CHECKOUT_BODY, city: undefined },
+    { ...VALID_CHECKOUT_BODY, city: "" },
+    { ...VALID_CHECKOUT_BODY, postal_code: undefined },
+    { ...VALID_CHECKOUT_BODY, postal_code: "" },
+    { ...VALID_CHECKOUT_BODY, country: undefined },
+    { ...VALID_CHECKOUT_BODY, country: "" },
+    { ...VALID_CHECKOUT_BODY, address_line2: 123 },
+    { ...VALID_CHECKOUT_BODY, phone: 123 },
+    { ...VALID_CHECKOUT_BODY, total: 200 },
     { email: "test@example.com" },
   ])("rejects an invalid request body %#", async (body) => {
     const response = await checkoutRequest(body);
@@ -183,12 +278,13 @@ describe("POST /api/cart/checkout", () => {
     expect(response.status).toBe(400);
     expect(mockCheckout).not.toHaveBeenCalled();
   });
+
   it("rejects a missing cart cookie", async () => {
     const response = await request(app)
       .post("/api/cart/checkout")
       .set("Origin", ORIGIN)
       .set("Content-Type", "application/json")
-      .send({ customer_email: "test@example.com" });
+      .send(VALID_CHECKOUT_BODY);
 
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe("CART_NOT_FOUND");
@@ -198,7 +294,7 @@ describe("POST /api/cart/checkout", () => {
 
   it("rejects a malformed cart cookie", async () => {
     const response = await checkoutRequest(
-      { customer_email: "test@example.com" },
+      VALID_CHECKOUT_BODY,
       "invalid-token",
     );
 
@@ -217,6 +313,7 @@ describe("POST /api/cart/checkout", () => {
     );
 
     const response = await checkoutRequest({
+      ...VALID_CHECKOUT_BODY,
       customer_email: "not-an-email",
     });
 
