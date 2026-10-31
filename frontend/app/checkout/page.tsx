@@ -16,6 +16,9 @@ import ContactInformation from "@/components/checkout/ContactInformation";
 import ShippingAddressForm from "@/components/checkout/ShippingAddressForm";
 import OrderSummary from "@/components/checkout/OrderSummary";
 import OrderConfirmation from "@/components/checkout/OrderConfirmation";
+import PaymentStep from "@/components/checkout/PaymentStep";
+
+type CheckoutStep = "shipping" | "payment";
 
 export default function CheckoutPage() {
   const [cart, setCart] = useState<Cart | null>(null);
@@ -31,6 +34,7 @@ export default function CheckoutPage() {
     phone: "",
   });
 
+  const [step, setStep] = useState<CheckoutStep>("shipping");
   const [order, setOrder] = useState<CheckoutOrder | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,9 +58,18 @@ export default function CheckoutPage() {
     }));
   }
 
-  async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
+  function handleContinueToPayment(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!cart || cart.items.length === 0) {
+      return;
+    }
+
+    setError("");
+    setStep("payment");
+  }
+
+  async function handlePay() {
     if (isSubmitting || !cart || cart.items.length === 0) {
       return;
     }
@@ -153,7 +166,9 @@ export default function CheckoutPage() {
         <h1 className="mt-8 text-4xl font-bold text-violet-950">Checkout</h1>
 
         <p className="mt-3 text-violet-700">
-          Enter your contact and shipping details to complete your order.
+          {step === "shipping"
+            ? "Enter your contact and shipping details."
+            : "Review your payment method and complete your order."}
         </p>
 
         <div
@@ -193,31 +208,52 @@ export default function CheckoutPage() {
         </div>
 
         <div className="mt-10 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <form
-            onSubmit={handleSubmit}
-            className="rounded-2xl bg-white p-6 shadow-sm sm:p-8"
-          >
-            <ContactInformation email={email} onEmailChange={setEmail} />
+          <div>
+            {step === "shipping" ? (
+              <form
+                onSubmit={handleContinueToPayment}
+                className="rounded-2xl bg-white p-6 shadow-sm sm:p-8"
+              >
+                <ContactInformation email={email} onEmailChange={setEmail} />
 
-            <ShippingAddressForm
-              shipping={shipping}
-              onChange={handleShippingChange}
-            />
+                <ShippingAddressForm
+                  shipping={shipping}
+                  onChange={handleShippingChange}
+                />
 
-            {error && (
-              <p role="alert" className="mt-5 text-sm text-red-700">
-                {error}
-              </p>
+                {error && (
+                  <p role="alert" className="mt-5 text-sm text-red-700">
+                    {error}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="mt-8 w-full rounded-xl bg-violet-700 px-5 py-3 font-semibold text-white hover:bg-violet-800"
+                >
+                  Continue to payment
+                </button>
+              </form>
+            ) : (
+              <div>
+                {error && (
+                  <p role="alert" className="mb-5 text-sm text-red-700">
+                    {error}
+                  </p>
+                )}
+
+                <PaymentStep
+                  cart={cart}
+                  onPay={handlePay}
+                  onBack={() => {
+                    setError("");
+                    setStep("shipping");
+                  }}
+                  isSubmitting={isSubmitting}
+                />
+              </div>
             )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="mt-8 w-full rounded-xl bg-violet-700 px-5 py-3 font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSubmitting ? "Creating order..." : "Place order"}
-            </button>
-          </form>
+          </div>
 
           <OrderSummary cart={cart} />
         </div>
