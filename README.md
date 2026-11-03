@@ -6,6 +6,34 @@ The project is built to practice REST API design, TypeScript, React, PostgreSQL,
 
 All purchases and payments are simulated. The fictional currency is the Pawstar (PWS).
 
+## Project Purpose
+
+Project Nebula is a hands-on learning project built to explore how a full-stack e-commerce platform works, from product catalogues and shopping carts to checkout, order management and database operations.
+
+The project combines practical software engineering challenges with a playful concept: a fictional world inhabited by hairless cats. The implementation takes the technical side seriously, while leaving room to experiment, learn and have fun along the way.
+
+## Screenshots
+
+### Product Catalog
+
+![Product Catalog](docs/catalog.png)
+
+### Product Details
+
+![Product Details](docs/product-details.png)
+
+### Shopping Cart
+
+![Shopping Cart](docs/shopping-cart.png)
+
+### Checkout
+
+![Checkout](docs/checkout.png)
+
+### Simulated Payment
+
+![Simulated Payment](docs/payment.png)
+
 ## Tech Stack
 
 | Layer    | Technologies                             |
