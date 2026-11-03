@@ -16,23 +16,23 @@ The project combines practical software engineering challenges with a playful co
 
 ### Product Catalog
 
-![Product Catalog](docs/screenshots/catalog.png)
+![Product Catalog](docs/catalog.png)
 
 ### Product Details
 
-![Product Details](docs/screenshots/product-details.png)
+![Product Details](docs/product-details.png)
 
 ### Shopping Cart
 
-![Shopping Cart](docs/screenshots/shopping-cart.png)
+![Shopping Cart](docs/shopping-cart.png)
 
 ### Checkout
 
-![Checkout](docs/screenshots/checkout.png)
+![Checkout](docs/checkout.png)
 
 ### Simulated Payment
 
-![Simulated Payment](docs/screenshots/payment.png)
+![Simulated Payment](docs/payment.png)
 
 ## Tech Stack
 
