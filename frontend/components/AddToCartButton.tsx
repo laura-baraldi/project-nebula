@@ -38,6 +38,17 @@ export default function AddToCartButton({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  // Automatically hide error messages after 3 seconds.
+  useEffect(() => {
+    if (!errorMessage) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setErrorMessage("");
+    }, 3000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [errorMessage]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -191,7 +202,7 @@ export default function AddToCartButton({
       {errorMessage && (
         <p
           role="status"
-          className="absolute right-0 top-full z-10 mt-2 w-max max-w-64 text-sm text-red-700"
+          className="absolute bottom-full right-0 z-10 mb-2 w-max max-w-64 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-red-700 shadow-md"
         >
           {errorMessage}
         </p>
